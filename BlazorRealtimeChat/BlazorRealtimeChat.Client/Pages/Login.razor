@@ -1,0 +1,63 @@
+﻿@page "/login"
+@layout EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using BlazorRealtimeChat.Client.Layout
+
+<div class="login-page-container">
+    <div class="login-card-wrapper">
+        <div class="login-card p-5 shadow">
+            <div class="text-center mb-4">
+                <h2 class="fw-bold">Blazor-RealTime-Chat</h2>
+                <p class="text-light">다시 만나다니 너무 반가워요!</p>
+            </div>
+
+            <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label for="UserName" class="form-label text-uppercase small fw-bold text-light">아이디</label>
+                    <InputText id="UserName" class="form-control form-control-lg bg-dark text-light border-secondary" @bind-Value="loginModel.UserName" />
+                    <ValidationMessage For="@(() => loginModel.UserName)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label text-uppercase small fw-bold">비밀번호</label>
+                    <InputText id="password" type="password" class="form-control form-control-lg bg-dark text-light border-secondary" @bind-Value="loginModel.Password" />
+                    <ValidationMessage For="@(() => loginModel.Password)" />
+                </div>
+
+                <div class="mb-3">
+                    <a href="#" class="small text-decoration-none">비밀번호를 잊으셨나요?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 btn-lg mt-3">로그인</button>
+
+                <div class="mt-3 text-center">
+                    <span class="text-light small">계정이 필요한가요? </span>
+                    <a href="/register" class="small text-decoration-none">가입하기</a>
+                </div>
+            </EditForm>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new LoginModel();
+
+    private async Task HandleLogin()
+    {
+        // TODO: 실제 로그인 API 호출 로직 구현
+        // 예: var result = await AuthService.LoginAsync(loginModel);
+        Console.WriteLine($"로그인 시도: {loginModel.UserName}");
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "이메일 또는 전화번호를 입력하세요.")]
+        public string UserName { get; set; }
+
+        [Required(ErrorMessage = "비밀번호를 입력하세요.")]
+        public string Password { get; set; }
+    }
+}

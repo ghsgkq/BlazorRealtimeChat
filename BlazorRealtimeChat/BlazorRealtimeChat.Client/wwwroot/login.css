@@ -1,0 +1,39 @@
+.login-page-container {
+    background-image: url("photo-1522441815192-d9f04eb0615c.avif"); /* 원하는 배경 이미지 URL */
+    background-size: cover;
+    background-position: center;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+}
+
+.login-card-wrapper {
+    display: flex;
+    background-color: #313338; /* 디스코드 다크 색상 */
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.login-card {
+    background-color: transparent;
+    border: none;
+    width: 480px;
+}
+
+/* 폼 컨트롤 색상 커스텀 */
+.form-control::placeholder {
+    color: #949ba4;
+}
+
+.form-control:focus {
+    background-color: #1e1f22;
+    border-color: #00a8fc;
+    box-shadow: none;
+    color: white;
+}
+
+.qr-code-section {
+    width: 320px;
+}

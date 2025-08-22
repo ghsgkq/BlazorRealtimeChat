@@ -1,4 +1,5 @@
 using System.Text;
+using BlazorRealtimeChat.Components;
 using BlazorRealtimeChat.Data;
 using BlazorRealtimeChat.Repositories;
 using BlazorRealtimeChat.Services;
@@ -7,6 +8,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddRazorComponents()
+    .AddInteractiveWebAssemblyComponents();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -76,6 +81,9 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(BlazorRealtimeChat.Client._Imports).Assembly);
 
 app.MapControllers();
 
