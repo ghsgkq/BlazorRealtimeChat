@@ -9,6 +9,7 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 
 // Scoped로 AuthService 등록
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IRegisterService, RegisterService>();
 
 // Blazored.LocalStorage 서비스 등록
 builder.Services.AddBlazoredLocalStorage();

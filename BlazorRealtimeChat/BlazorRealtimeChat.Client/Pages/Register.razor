@@ -1,0 +1,27 @@
+﻿@page "/register"
+@layout EmptyLayout
+@rendermode InteractiveWebAssembly
+
+@using System.ComponentModel.DataAnnotations
+@using BlazorRealtimeChat.Client.Layout
+@using BlazorRealtimeChat.Shared.DTOs
+@using BlazorRealtimeChat.Client.Services
+@using BlazorRealtimeChat.Client.Components
+
+
+@if (OperatingSystem.IsBrowser())
+{
+    <RegisterPageContent />
+}
+else
+{
+     @* 서버가 미리 렌더링할 때는 이 로딩 메시지만 보여줍니다 *@
+    <div class="login-page-container">
+        <p style="color: white;">Loading...</p>
+    </div>
+}
+
+@code {
+
+  
+}
