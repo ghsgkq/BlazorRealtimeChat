@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace BlazorRealtimeChat.Controllers;
 
 [ApiController]
-[Route("api/[Controller]")]
+[Route("api/user")]
 public class UserController : ControllerBase
 {
     private readonly IUserService _userService;
