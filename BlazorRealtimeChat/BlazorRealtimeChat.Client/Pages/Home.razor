@@ -1,7 +1,107 @@
 ﻿@page "/"
+@using BlazorRealtimeChat.Client.Layout
+@using BlazorRealtimeChat.Shared.DTOs
+@using Microsoft.AspNetCore.Authorization
+@inject HttpClient Http
 
-<PageTitle>Home</PageTitle>
+@layout EmptyLayout
+@attribute [Authorize] // 이 페이지는 로그인한 사용자만 접근 가능
+<div class="page d-flex">
+    <!-- 왼쪽: 서버 및 채널 목록 사이드바 -->
+    <div class="sidebar d-flex flex-column flex-shrink-0 p-3 text-white bg-dark">
+        <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+            <span class="fs-4">Blazor Chat</span>
+        </a>
+        <hr>
+        <ul class="nav nav-pills flex-column mb-auto">
+            @if (channels == null)
+            {
+                <li class="p-2 text-muted">채널 목록을 불러오는 중...</li>
+            }
+            else if (!channels.Any())
+            {
+                <li class="p-2 text-muted">채널이 없습니다.</li>
+            }
+            else
+            {
+                @foreach (var channel in channels)
+                {
+                    <li class="channel-item p-2 rounded">
+                        <span># @channel.ChannelName</span>
+                    </li>
+                }
+            }
+        </ul>
+        <hr>
+        <div class="dropdown">
+            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=G" alt="" width="32" height="32" class="rounded-circle me-2">
+                <strong>gregory</strong>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
+                <li><a class="dropdown-item" href="#">프로필</a></li>
+                <li><a class="dropdown-item" href="#">설정</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="#">로그아웃</a></li>
+            </ul>
+        </div>
+    </div>
 
-<h1>Hello, world!</h1>
+    <!-- 오른쪽: 메인 채팅창 영역 -->
+    <div class="chat-area d-flex flex-column flex-grow-1">
+        <!-- 상단: 현재 채널 이름 헤더 -->
+        <div class="chat-header p-3 border-bottom bg-light">
+            <h5 class="mb-0"># 일반</h5>
+        </div>
 
-Welcome to your new app.
+        <!-- 중앙: 채팅 메시지 스크롤 영역 -->
+        <div class="chat-messages flex-grow-1 p-3">
+            <!-- 샘플 메시지 1 -->
+            <div class="d-flex mb-3">
+                <img src="https://placehold.co/40x40/5865F2/FFFFFF?text=U" alt="User" class="rounded-circle me-3" style="width: 40px; height: 40px;">
+                <div>
+                    <strong class="d-block">User1</strong>
+                    <span>안녕하세요! Blazor 채팅 앱에 오신 것을 환영합니다.</span>
+                </div>
+            </div>
+            <!-- 샘플 메시지 2 -->
+            <div class="d-flex mb-3">
+                <img src="https://placehold.co/40x40/43B581/FFFFFF?text=T" alt="User" class="rounded-circle me-3" style="width: 40px; height: 40px;">
+                <div>
+                    <strong class="d-block">Tester</strong>
+                    <span>여기는 샘플 메시지입니다. 레이아웃이 멋지네요.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 하단: 메시지 입력창 -->
+        <div class="chat-input p-3 bg-light border-top">
+            <input type="text" class="form-control" placeholder="# 일반 채널에 메시지 보내기">
+        </div>
+    </div>
+</div>
+
+@code {
+    // Api로부터 받아온 채널 목록을 저장할 리스트
+    private List<ChannelDto> channels = new List<ChannelDto>();
+
+    // OnInitializedAsync는 컴포넌트가 초기화될 때 한 번만 실행되는 생명주기 메서드입니다.
+    // API에서 초기 데이터를 불러오기에 가장 좋은 위치입니다.
+    protected override async Task OnInitializedAsync()
+    {
+            try
+        {
+            // HttpClient를 사용하여 백엔드 API를 호출하고, 결과를 ChannelDto 리스트로 받아옵니다.
+            channels = await Http.GetFromJsonAsync<List<ChannelDto>>("api/channels");
+        }
+        catch (Exception ex)
+        {
+            // API 호출에 실패할 경우 콘솔에 에러를 출력합니다.
+            Console.WriteLine($"채널 목록을 불러오는 데 실패했습니다: {ex.Message}");
+            channels = new List<ChannelDto>(); // 에러가 나면 빈 리스트로 초기화
+        }
+    
+    }
+
+
+}

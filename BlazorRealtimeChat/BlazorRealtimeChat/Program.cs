@@ -35,9 +35,11 @@ builder.Services.AddDbContext<RealTimeChatContext>(options =>
 
 // Repository 등록
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IChannelRepository, ChannelRepository>();
 
 // Service 등록
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IChannelService, ChannelService>();
 
 // TokenService 등록
 builder.Services.AddScoped<ITokenService, TokenService>();

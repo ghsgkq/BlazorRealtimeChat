@@ -1,0 +1,20 @@
+/* 페이지 전체를 뷰포트 높이에 맞춤 */
+.page {
+    height: 100vh;
+    overflow: hidden; /* 전체 페이지 스크롤 방지 */
+}
+
+/* 왼쪽 사이드바 고정 너비 */
+.sidebar {
+    width: 240px;
+}
+
+/* 오른쪽 채팅 영역 */
+.chat-area {
+    background-color: #f8f9fa; /* 밝은 회색 배경 */
+}
+
+/* 채팅 메시지 영역이 남은 공간을 모두 차지하고 스크롤되도록 설정 */
+.chat-messages {
+    overflow-y: auto;
+}
