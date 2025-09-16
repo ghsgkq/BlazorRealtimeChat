@@ -1,107 +1,154 @@
 ﻿@page "/"
+
+@rendermode InteractiveWebAssembly
+
 @using BlazorRealtimeChat.Client.Layout
+@using BlazorRealtimeChat.Client.Services
 @using BlazorRealtimeChat.Shared.DTOs
 @using Microsoft.AspNetCore.Authorization
-@inject HttpClient Http
+@using BlazorRealtimeChat.Client.Components
+@using Microsoft.AspNetCore.Components.Authorization
 
 @layout EmptyLayout
-@attribute [Authorize] // 이 페이지는 로그인한 사용자만 접근 가능
-<div class="page d-flex">
-    <!-- 왼쪽: 서버 및 채널 목록 사이드바 -->
-    <div class="sidebar d-flex flex-column flex-shrink-0 p-3 text-white bg-dark">
-        <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-            <span class="fs-4">Blazor Chat</span>
-        </a>
-        <hr>
-        <ul class="nav nav-pills flex-column mb-auto">
-            @if (channels == null)
-            {
-                <li class="p-2 text-muted">채널 목록을 불러오는 중...</li>
-            }
-            else if (!channels.Any())
-            {
-                <li class="p-2 text-muted">채널이 없습니다.</li>
-            }
-            else
-            {
-                @foreach (var channel in channels)
-                {
-                    <li class="channel-item p-2 rounded">
-                        <span># @channel.ChannelName</span>
-                    </li>
-                }
-            }
-        </ul>
-        <hr>
-        <div class="dropdown">
-            <a href="#" class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                <img src="https://placehold.co/32x32/5865F2/FFFFFF?text=G" alt="" width="32" height="32" class="rounded-circle me-2">
-                <strong>gregory</strong>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-dark text-small shadow">
-                <li><a class="dropdown-item" href="#">프로필</a></li>
-                <li><a class="dropdown-item" href="#">설정</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item" href="#">로그아웃</a></li>
-            </ul>
-        </div>
-    </div>
 
-    <!-- 오른쪽: 메인 채팅창 영역 -->
-    <div class="chat-area d-flex flex-column flex-grow-1">
-        <!-- 상단: 현재 채널 이름 헤더 -->
-        <div class="chat-header p-3 border-bottom bg-light">
-            <h5 class="mb-0"># 일반</h5>
-        </div>
+@inject IServiceProvider ServiceProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
-        <!-- 중앙: 채팅 메시지 스크롤 영역 -->
-        <div class="chat-messages flex-grow-1 p-3">
-            <!-- 샘플 메시지 1 -->
-            <div class="d-flex mb-3">
-                <img src="https://placehold.co/40x40/5865F2/FFFFFF?text=U" alt="User" class="rounded-circle me-3" style="width: 40px; height: 40px;">
-                <div>
-                    <strong class="d-block">User1</strong>
-                    <span>안녕하세요! Blazor 채팅 앱에 오신 것을 환영합니다.</span>
+
+
+@if (OperatingSystem.IsBrowser())
+{
+<div class="d-flex home-container">
+     <!-- 왼쪽 사이드바 (채널 목록) -->
+     <div class="sidebar bg-dark text-light flex-shrink-0">
+          <div class="p-3">
+                    <h5 class="fw-bold">Blazor Chat</h5>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center px-2 mb-1">
+                    <span class="small text-uppercase">채널</span>
+                    <button class="btn btn-sm text-light" @onclick="ToggleAddChannelInput">+</button>
+                </div>
+
+                <ul class="list-unstyled p-2">
+                    @* --- 채널 추가 입력 폼 --- *@
+                    @if (showAddChannelInput)
+                    {
+                        <li class="p-2">
+                            <EditForm Model="newChannel" OnValidSubmit="HandleCreateChannel">
+                                <DataAnnotationsValidator />
+                                <div class="input-group">
+                                    <InputText @bind-Value="newChannel.ChannelName" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="새 채널 이름" />
+                                    <button type="submit" class="btn btn-sm btn-success">✓</button>
+                                </div>
+                                <ValidationMessage For="@(() => newChannel.ChannelName)" />
+                            </EditForm>
+                        </li>
+                    }
+                    
+                    @if (channels == null)
+                    {
+                        <li class="p-2 text-muted">채널 목록을 불러오는 중...</li>
+                    }
+                    else
+                    {
+                        @foreach (var channel in channels)
+                        {
+                            <li class="channel-item p-2 rounded">
+                                <span># @channel.ChannelName</span>
+                            </li>
+                        }
+                    }
+                </ul>
+                <div class="user-profile mt-auto p-3 d-flex align-items-center">
+                    <span class="bg-secondary rounded-circle me-2" style="width: 32px; height: 32px;"></span>
+                    <span class="fw-bold">gregory</span>
                 </div>
             </div>
-            <!-- 샘플 메시지 2 -->
-            <div class="d-flex mb-3">
-                <img src="https://placehold.co/40x40/43B581/FFFFFF?text=T" alt="User" class="rounded-circle me-3" style="width: 40px; height: 40px;">
-                <div>
-                    <strong class="d-block">Tester</strong>
-                    <span>여기는 샘플 메시지입니다. 레이아웃이 멋지네요.</span>
+
+            <!-- 오른쪽 메인 콘텐츠 (채팅창) -->
+            <div class="main-content d-flex flex-column flex-grow-1">
+                <div class="chat-header p-3 border-bottom border-secondary">
+                    <h5 class="mb-0 fw-bold"># 일반</h5>
+                </div>
+                <div class="chat-messages flex-grow-1 p-3" style="overflow-y: auto;">
+                    <!-- 메시지 목록 -->
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0">
+                            <span class="bg-secondary rounded-circle" style="width: 40px; height: 40px; display: block;"></span>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <div class="fw-bold">User1</div>
+                            <div>안녕하세요! Blazor 채팅 앱에 오신 것을 환영합니다.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input p-3 bg-dark-subtle">
+                    <input type="text" class="form-control bg-dark text-light border-secondary" placeholder="# 일반에 메시지 보내기" />
                 </div>
             </div>
         </div>
-
-        <!-- 하단: 메시지 입력창 -->
-        <div class="chat-input p-3 bg-light border-top">
-            <input type="text" class="form-control" placeholder="# 일반 채널에 메시지 보내기">
-        </div>
+}
+else
+{
+    @* 서버가 미리 렌더링할 때는 이 로딩 메시지만 보여줍니다 *@
+    <div class="d-flex justify-content-center align-items-center" style="height: 100vh; background-color: #313338;">
+         <p style="color: white;">Loading application...</p>
     </div>
-</div>
+}
+
+
 
 @code {
-    // Api로부터 받아온 채널 목록을 저장할 리스트
-    private List<ChannelDto> channels = new List<ChannelDto>();
+    private IChannelService channelService;
+    private List<ChannelDto> channels;
+    private CreateChannelDto newChannel = new CreateChannelDto();
+    private bool showAddChannelInput = false;
 
-    // OnInitializedAsync는 컴포넌트가 초기화될 때 한 번만 실행되는 생명주기 메서드입니다.
-    // API에서 초기 데이터를 불러오기에 가장 좋은 위치입니다.
+
+    protected override void OnInitialized()
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            channelService = ServiceProvider.GetRequiredService<IChannelService>();
+        }
+    }
     protected override async Task OnInitializedAsync()
     {
-            try
+        try
         {
-            // HttpClient를 사용하여 백엔드 API를 호출하고, 결과를 ChannelDto 리스트로 받아옵니다.
-            channels = await Http.GetFromJsonAsync<List<ChannelDto>>("api/channels");
+            // HttpClient 대신 ChannelService 사용
+            channels = await channelService.GetChannelsAsync();
         }
         catch (Exception ex)
         {
-            // API 호출에 실패할 경우 콘솔에 에러를 출력합니다.
             Console.WriteLine($"채널 목록을 불러오는 데 실패했습니다: {ex.Message}");
-            channels = new List<ChannelDto>(); // 에러가 나면 빈 리스트로 초기화
+            channels = new List<ChannelDto>();
         }
-    
     }
 
+    private void ToggleAddChannelInput()
+    {
+        showAddChannelInput = !showAddChannelInput;
+    }
 
+    private async Task HandleCreateChannel()
+    {
+        newChannel.ServerId = Guid.Parse("e72ec4f9-0891-42fb-b9f3-46ab10935ac2");
+
+        // HttpClient 대신 ChannelService 사용
+        var createdChannel = await channelService.CreateChannelAsync(newChannel);
+
+        if (createdChannel != null)
+        {
+            channels.Add(createdChannel);
+            newChannel.ChannelName = string.Empty;
+            showAddChannelInput = false;
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "채널 생성에 실패했습니다.", "error");
+        }
+    }
 }

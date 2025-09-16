@@ -1,4 +1,5 @@
 using System.Text;
+using Blazored.LocalStorage;
 using BlazorRealtimeChat.Components;
 using BlazorRealtimeChat.Data;
 using BlazorRealtimeChat.Repositories;
@@ -60,6 +61,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     };
 });
 
+// Blazored.LocalStorage 등록
+builder.Services.AddBlazoredLocalStorage();
+
 var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
@@ -86,6 +90,7 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(BlazorRealtimeChat.Client._Imports).Assembly);
+
 
 app.MapControllers();
 

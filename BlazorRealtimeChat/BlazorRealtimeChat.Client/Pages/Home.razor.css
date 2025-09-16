@@ -1,20 +1,38 @@
-/* 페이지 전체를 뷰포트 높이에 맞춤 */
-.page {
+/* 전체 레이아웃을 화면 높이에 꽉 채웁니다 */
+.home-container {
     height: 100vh;
-    overflow: hidden; /* 전체 페이지 스크롤 방지 */
 }
 
-/* 왼쪽 사이드바 고정 너비 */
+/* 왼쪽 사이드바의 너비와 레이아웃을 설정합니다 */
 .sidebar {
     width: 240px;
+    display: flex;
+    flex-direction: column;
 }
 
-/* 오른쪽 채팅 영역 */
-.chat-area {
-    background-color: #f8f9fa; /* 밝은 회색 배경 */
+/* 채널 목록 아이템에 호버 효과를 줍니다 */
+.channel-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
 }
 
-/* 채팅 메시지 영역이 남은 공간을 모두 차지하고 스크롤되도록 설정 */
-.chat-messages {
-    overflow-y: auto;
+/* 사용자 프로필 섹션이 항상 하단에 고정되도록 합니다 */
+.user-profile {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* 오른쪽 메인 콘텐츠 영역 설정 */
+.main-content {
+    background-color: #313338; /* 디스코드 배경색과 유사 */
+    color: #dcddde; /* 디스코드 글자색과 유사 */
+}
+
+/* 채팅창 헤더 스타일 */
+.chat-header {
+    background-color: #313338;
+}
+
+/* 메시지 입력창 스타일 */
+.chat-input {
+    background-color: #40444b; /* 입력창 배경색 */
 }

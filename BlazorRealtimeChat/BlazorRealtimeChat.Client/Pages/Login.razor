@@ -1,14 +1,65 @@
-﻿@page "/login"
+@page "/login"
 @rendermode InteractiveWebAssembly
 
 @layout EmptyLayout
-@using BlazorRealtimeChat.Client.Components
 @using BlazorRealtimeChat.Client.Layout
+@using BlazorRealtimeChat.Client.Services
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject IServiceProvider ServiceProvider
 
 
 @if (OperatingSystem.IsBrowser())
 {
-    <LoginPageContent />
+    <div class="login-page-container">
+        <div class="login-card-wrapper">
+            <div class="login-card p-5 shadow">
+                <div class="text-center mb-4">
+                    <h2 class="fw-bold">Blazor-RealTime-Chat</h2>
+                    <p class="text-light">다시 만나다니 너무 반가워요!</p>
+                </div>
+
+                <EditForm Model="@loginModel" OnValidSubmit="HandleLogin">
+                    <DataAnnotationsValidator />
+
+                    <div class="mb-3">
+                        <label for="UserName" class="form-label text-uppercase small fw-bold text-light">아이디</label>
+                        <InputText id="UserName" class="form-control form-control-lg bg-dark text-light border-secondary" @bind-Value="loginModel.UserName" />
+                        <ValidationMessage For="@(() => loginModel.UserName)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label text-uppercase small fw-bold">비밀번호</label>
+                        <InputText id="password" type="password" class="form-control form-control-lg bg-dark text-light border-secondary" @bind-Value="loginModel.Password" />
+                        <ValidationMessage For="@(() => loginModel.Password)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <a href="#" class="small text-decoration-none">비밀번호를 잊으셨나요?</a>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 btn-lg mt-3" disabled="@isProcessing">
+                        @if(isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span class="sr-only">Loading...</span>
+                        }
+                        else
+                        {
+                            <span>로그인</span>
+                        }
+                    </button>
+
+                    <div class="mt-3 text-center">
+                        <span class="text-light small">계정이 필요한가요? </span>
+                        <a href="/register" class="small text-decoration-none">가입하기</a>
+                    </div>
+                </EditForm>
+            </div>
+
+        </div>
+    </div>
 }
 else
 {
@@ -17,6 +68,48 @@ else
         <p style="color: white;">Loading...</p>
     </div>
 }
-@code{
 
+@code {
+    private IAuthService? AuthService;
+    private LoginModel loginModel = new LoginModel();
+    private bool isProcessing = false;
+
+    protected override void OnInitialized()
+    {
+        if (OperatingSystem.IsBrowser())
+        {
+            AuthService = ServiceProvider.GetRequiredService<IAuthService>();
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        if(AuthService is null)
+        {
+            return;
+        }
+        isProcessing = true;
+        var success = await AuthService.LoginAsync(loginModel.UserName, loginModel.Password);
+        
+        if (success)
+        {
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+             // 기본 alert 대신 SweetAlert2의 Swal.fire 함수를 호출합니다.
+            // 파라미터: (제목, 내용, 아이콘 타입)
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "로그인 실패", "아이디와 비밀번호를 확인해주세요.", "error");
+        }
+        isProcessing = false;
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "이메일 또는 전화번호를 입력하세요.")]
+        public string UserName { get; set; }
+
+        [Required(ErrorMessage = "비밀번호를 입력하세요.")]
+        public string Password { get; set; }
+    }
 }
