@@ -7,21 +7,13 @@ namespace BlazorRealtimeChat.Controllers;
 
 [ApiController]
 [Route("api/user")]
-public class UserController : ControllerBase
+public class UserController(IUserService userService, ITokenService tokenService) : ControllerBase
 {
-    private readonly IUserService _userService;
-    private readonly ITokenService _tokenService;
-
-    public UserController(IUserService userService, ITokenService tokenService)
-    {
-        _userService = userService;
-        _tokenService = tokenService;
-    }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(UserRegisterDto userDto)
     {
-        var (success, errorMessage) = await _userService.RegisterUserAsync(userDto);
+        var (success, errorMessage) = await userService.RegisterUserAsync(userDto);
 
         if (!success)
         {
@@ -34,7 +26,7 @@ public class UserController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(UserLoginDto userDto)
     {
-        var user = await _userService.LoginUserAsync(userDto);
+        var user = await userService.LoginUserAsync(userDto);
 
         // 1. 사용자 비밀번호 검증
         if (user == null)
@@ -43,11 +35,11 @@ public class UserController : ControllerBase
         }
 
         // 2. 토큰 생성
-        var accessToken = _tokenService.GenerateTokenAsync(user);
-        var refreshToken = _tokenService.GenrateRefreshTokenAsync();
+        var accessToken = tokenService.GenerateTokenAsync(user);
+        var refreshToken = tokenService.GenrateRefreshTokenAsync();
 
         // 3. Refresh Token을 DB에 저장 (나중에 검증을 위해)
-        // 예: await _userService.SaveRefreshTokenAsync(user.UserId, refreshToken);
+        // 예: await userService.SaveRefreshTokenAsync(user.UserId, refreshToken);
         
         return Ok(new
         {

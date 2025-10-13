@@ -5,24 +5,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlazorRealtimeChat.Repositories;
 
-public class UserRepository : IUserRepository
+public class UserRepository(RealTimeChatContext context) : IUserRepository
 {
-    private readonly RealTimeChatContext _context;
-
-    public UserRepository(RealTimeChatContext context)
-    {
-        _context = context;
-    }
 
     public async Task<User?> GetUserByUsernameAsync(string username)
     {
-        return await _context.Users.FirstOrDefaultAsync(u => u.UserName == username);
+        return await context.Users.FirstOrDefaultAsync(u => u.UserName == username);
     }
 
     public async Task<User> AddUserAsync(User user)
     {
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
         return user;
     }
 }

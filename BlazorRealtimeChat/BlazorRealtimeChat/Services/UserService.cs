@@ -5,19 +5,13 @@ using BlazorRealtimeChat.Shared.DTOs;
 
 namespace BlazorRealtimeChat.Services;
 
-public class UserService : IUserService
+public class UserService(IUserRepository userRepository) : IUserService
 {
-    private readonly IUserRepository _userRepository;
-
-    public UserService(IUserRepository userRepository)
-    {
-        _userRepository = userRepository;
-    }
-
+    
     public async Task<(bool Success, string ErrorMessage)> RegisterUserAsync(UserRegisterDto userDto)
     {
         // 1. 사용자 이름 중복 확인
-        var existingUser = await _userRepository.GetUserByUsernameAsync(userDto.Username);
+        var existingUser = await userRepository.GetUserByUsernameAsync(userDto.Username);
         if (existingUser != null)
         {
             return (false, "Username already exists.");
@@ -35,7 +29,7 @@ public class UserService : IUserService
         };
 
         // 3. 사용자 정보 저장
-        await _userRepository.AddUserAsync(newUser);
+        await userRepository.AddUserAsync(newUser);
 
 
         return (true, "");
@@ -44,7 +38,7 @@ public class UserService : IUserService
     public async Task<User?> LoginUserAsync(UserLoginDto userDto)
     {
         // 1. 사용자 이름으로 사용자 정보 조회
-        var user = await _userRepository.GetUserByUsernameAsync(userDto.Username);
+        var user = await userRepository.GetUserByUsernameAsync(userDto.Username);
         if (user == null)
         {
             return null; // 사용자 없음

@@ -8,19 +8,13 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace BlazorRealtimeChat.Services;
 
-public class TokenService : ITokenService
+public class TokenService(IConfiguration config) : ITokenService
 {
-
-    private readonly IConfiguration _config;
     
-    public TokenService(IConfiguration config)
-    {
-        _config = config;
-    }
 
     public string GenerateTokenAsync(User user)
     {
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Secret"]));
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Secret"]));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         // 클레임(Claim) 설정 : 토큰에 담을 정보
@@ -31,8 +25,8 @@ public class TokenService : ITokenService
         };
 
         var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
+            issuer: config["Jwt:Issuer"],
+            audience: config["Jwt:Audience"],
             claims: claim,
             expires: DateTime.Now.AddHours(1), // 토큰 유효 기간 설정 (1시간)
             signingCredentials: credentials

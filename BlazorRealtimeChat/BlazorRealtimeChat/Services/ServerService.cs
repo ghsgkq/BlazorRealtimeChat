@@ -5,8 +5,6 @@ namespace BlazorRealtimeChat.Services;
 
 public class ServerService(IServerRepository serverRepository) : IServerService
 {
-
-
     public async Task<IEnumerable<ServerDto>> GetServersAsync()
     {
         var servers = await serverRepository.GetServersAsync();
