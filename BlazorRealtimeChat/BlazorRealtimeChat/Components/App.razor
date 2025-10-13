@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* 제가 멋대로 삭제했던, .NET 8의 올바른 정적 에셋 참조 방식입니다. *@
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["BlazorRealtimeChat.styles.css"]" />
@@ -15,7 +16,8 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveWebAssembly" />
+    @* 사전 렌더링을 비활성화하는 올바른 설정은 그대로 유지합니다. *@
+    <Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
     <script src="_framework/blazor.web.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>

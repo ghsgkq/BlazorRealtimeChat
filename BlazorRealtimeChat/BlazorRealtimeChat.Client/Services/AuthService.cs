@@ -2,6 +2,7 @@ using System;
 using System.Net.Http.Json;
 using Blazored.LocalStorage;
 using BlazorRealtimeChat.Shared.DTOs;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace BlazorRealtimeChat.Client.Services;
 
@@ -9,11 +10,13 @@ public class AuthService : IAuthService
 {
     private readonly HttpClient _httpClient;
     private readonly ILocalStorageService _localStorage;
+    private readonly AuthenticationStateProvider _authenticationStateProvider;
 
-    public AuthService(HttpClient httpClient, ILocalStorageService localStorage)
+    public AuthService(HttpClient httpClient, ILocalStorageService localStorage, AuthenticationStateProvider authenticationStateProvider)
     {
         _httpClient = httpClient;
         _localStorage = localStorage;
+        _authenticationStateProvider = authenticationStateProvider;
     }
 
     public async Task<bool> LoginAsync(string userName, string password)
@@ -33,26 +36,23 @@ public class AuthService : IAuthService
 
         var result = await response.Content.ReadFromJsonAsync<LoginResult>();
 
-        if (result is null)
+        if (result is null || string.IsNullOrEmpty(result.AccessToken))
         {
             return false;
         }
 
         await _localStorage.SetItemAsync("accessToken", result.AccessToken);
-        // Refresh Token은 안전하게 Local Storage에 저장 (Access Token 재발급 시 사용)
         await _localStorage.SetItemAsync("refreshToken", result.RefreshToken);
 
-        // Access Token은 HttpClient의 기본 헤더에 설정 (API 요청 시마다 사용)
-        _httpClient.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", result.AccessToken);
+        ((CustomAuthStateProvider)_authenticationStateProvider).NotifyUserAuthentication(result.AccessToken);
 
         return true;
     }
     
     public async Task LogoutAsync()
     {
-        // HttpClient 헤더와 Local Storage에서 토큰 정보 제거
-        _httpClient.DefaultRequestHeaders.Authorization = null;
+        await _localStorage.RemoveItemAsync("accessToken");
         await _localStorage.RemoveItemAsync("refreshToken");
+        ((CustomAuthStateProvider)_authenticationStateProvider).NotifyUserLogout();
     }
 }

@@ -1,13 +1,6 @@
-﻿@using BlazorRealtimeChat.Client.Components
-@using Microsoft.AspNetCore.Components.Authorization;
-
-<Router AppAssembly="@typeof(Program).Assembly">
+﻿<Router AppAssembly="@typeof(Program).Assembly">
     <Found Context="routeData">
-        @*
-            찾은 페이지에 대해 인증 검사를 수행합니다.
-        *@
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
-        
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>

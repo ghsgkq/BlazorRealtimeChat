@@ -1,5 +1,9 @@
 .login-page-container {
-    background-image: url("photo-1522441815192-d9f04eb0615c.avif"); /* 원하는 배경 이미지 URL */
+    /* 
+        클라이언트 프로젝트의 wwwroot에 있는 자산을 참조하는 공식적인 절대 경로입니다.
+        /_content/{프로젝트이름}/{파일경로}
+    */
+    background-image: url("login_background.png"); 
     background-size: cover;
     background-position: center;
     min-height: 100vh;

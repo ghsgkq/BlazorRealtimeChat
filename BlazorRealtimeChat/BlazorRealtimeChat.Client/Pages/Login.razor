@@ -10,8 +10,6 @@
 @inject IServiceProvider ServiceProvider
 
 
-@if (OperatingSystem.IsBrowser())
-{
     <div class="login-page-container">
         <div class="login-card-wrapper">
             <div class="login-card p-5 shadow">
@@ -60,14 +58,6 @@
 
         </div>
     </div>
-}
-else
-{
-     @* 서버가 미리 렌더링할 때는 이 로딩 메시지만 보여줍니다 *@
-    <div class="login-page-container">
-        <p style="color: white;">Loading...</p>
-    </div>
-}
 
 @code {
     private IAuthService? AuthService;

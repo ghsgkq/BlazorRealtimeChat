@@ -1,5 +1,5 @@
 .login-page-container {
-    background-image: url("photo-1522441815192-d9f04eb0615c.avif"); /* 원하는 배경 이미지 URL */
+    background-image: url("login_background.png"); /* 원하는 배경 이미지 URL */
     background-size: cover;
     background-position: center;
     min-height: 100vh;
