@@ -16,6 +16,20 @@ public class ServerService(IServerRepository serverRepository) : IServerService
             ServerName = server.ServerName
         });
     }
-    
-    
+
+    public async Task<ServerDto> AddServerAsync(CreateServerDto createServerDto)
+    {
+        var newServer = new Data.Entity.Server
+        {
+            ServerName = createServerDto.ServerName
+        };
+
+        var createdServer = await serverRepository.AddServerAsync(newServer);
+
+        return new ServerDto
+        {
+            ServerId = createdServer.ServerId,
+            ServerName = createdServer.ServerName
+        };
+    }
 }

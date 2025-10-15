@@ -7,10 +7,11 @@ namespace BlazorRealtimeChat.Repositories;
 
 public class ChannelRepository(RealTimeChatContext context) : IChannelRepository
 {
-    public async Task<IEnumerable<Channel>> GetChannelsAsync()
+    public async Task<IEnumerable<Channel>> GetChannelsAsync(Guid serverId)
     {
         // 모든 채널을 이름순으로 정렬하여 반환합니다.
         return await context.Channels
+            .Where(c => c.ServerId == serverId)
             .OrderBy(c => c.ChannelName)
             .ToListAsync();
     }

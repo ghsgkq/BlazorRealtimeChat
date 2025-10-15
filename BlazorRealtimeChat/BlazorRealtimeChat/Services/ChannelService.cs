@@ -8,9 +8,9 @@ public class ChannelService(IChannelRepository channelRepository) : IChannelServ
 {
 
 
-    public async Task<IEnumerable<ChannelDto>> GetChannelsAsync()
+    public async Task<IEnumerable<ChannelDto>> GetChannelsAsync(Guid serverId)
     {
-        var channels = await channelRepository.GetChannelsAsync();
+        var channels = await channelRepository.GetChannelsAsync(serverId);
 
         // 데이터베이스 엔티티(Channel)를 프론트엔드용 DTO(ChannelDto)로 변환합니다.
         return channels.Select(channel => new ChannelDto

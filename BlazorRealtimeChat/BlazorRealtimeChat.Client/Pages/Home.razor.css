@@ -1,38 +1,50 @@
-/* 전체 레이아웃을 화면 높이에 꽉 채웁니다 */
 .home-container {
     height: 100vh;
 }
 
-/* 왼쪽 사이드바의 너비와 레이아웃을 설정합니다 */
-.sidebar {
-    width: 240px;
+/* 가장 왼쪽 서버 목록 사이드바 */
+.server-list-sidebar {
+    width: 72px;
+    background-color: #202225; /* 디스코드 서버 목록 배경색 */
+    padding-top: 12px;
     display: flex;
     flex-direction: column;
+    align-items: center;
 }
 
-/* 채널 목록 아이템에 호버 효과를 줍니다 */
-.channel-item:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+.server-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%; /* 동그란 아이콘 */
+    background-color: #36393f;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 8px;
     cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: bold;
+    overflow: hidden; /* 텍스트가 아이콘 밖으로 나가지 않도록 */
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* 사용자 프로필 섹션이 항상 하단에 고정되도록 합니다 */
-.user-profile {
-    background-color: rgba(0, 0, 0, 0.2);
+.server-icon:hover, .server-icon.selected {
+    border-radius: 16px; /* 호버 또는 선택 시 둥근 사각형으로 변경 */
+    background-color: #5865f2; /* 디스코드 블루 */
 }
 
-/* 오른쪽 메인 콘텐츠 영역 설정 */
-.main-content {
-    background-color: #313338; /* 디스코드 배경색과 유사 */
-    color: #dcddde; /* 디스코드 글자색과 유사 */
+.server-separator {
+    width: 32px;
+    height: 2px;
+    background-color: #36393f;
+    border-radius: 1px;
+    margin: 0 auto 8px auto;
 }
 
-/* 채팅창 헤더 스타일 */
-.chat-header {
-    background-color: #313338;
-}
-
-/* 메시지 입력창 스타일 */
-.chat-input {
-    background-color: #40444b; /* 입력창 배경색 */
+/* 기존 채널 목록 사이드바 */
+.channel-sidebar {
+    width: 240px;
+    background-color: #2f3136; /* 디스코드 채널 목록 배경색 */
 }

@@ -5,6 +5,6 @@ namespace BlazorRealtimeChat.Repositories;
 
 public interface IChannelRepository
 {
-    Task<IEnumerable<Channel>> GetChannelsAsync();
+    Task<IEnumerable<Channel>> GetChannelsAsync(Guid serverId);
     Task<Channel> AddChannelAsync(Channel channel);
 }

@@ -1,29 +1,28 @@
 using System;
 using BlazorRealtimeChat.Services;
 using BlazorRealtimeChat.Shared.DTOs;
-using Microsoft.AspNetCore.Authorization; // [Authorize] 속성을 사용하기 위해 추가합니다.
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlazorRealtimeChat.Controllers;
 
-[Authorize] // 바로 이 한 줄이 Spring Security의 필터와 같은 역할을 합니다.
+[Authorize]
 [ApiController]
-[Route("api/channel")]
+[Route("api/servers/{serverId}/channels")]
 public class ChannelController(IChannelService channelService) : ControllerBase
 {
 
     [HttpGet]
-    public async Task<IActionResult> GetChannels()
+    public async Task<IActionResult> GetChannels(Guid serverId)
     {
-        var channels = await channelService.GetChannelsAsync();
+        var channels = await channelService.GetChannelsAsync(serverId);
         return Ok(channels);
     }
 
     [HttpPost]
-    public async Task<IActionResult> AddChannel(CreateChannelDto createChannelDto)
+    public async Task<IActionResult> AddChannel(Guid serverId, CreateChannelDto createChannelDto)
     {
-
         var newChannel = await channelService.AddChannelAsync(createChannelDto);
-        return CreatedAtAction(nameof(GetChannels), new { id = newChannel.ChannelId }, newChannel);
+        return CreatedAtAction(nameof(GetChannels), new { serverId = serverId, channelId = newChannel.ChannelId }, newChannel);
     }
 }

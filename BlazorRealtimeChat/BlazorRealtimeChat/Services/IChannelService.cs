@@ -5,6 +5,6 @@ namespace BlazorRealtimeChat.Services;
 
 public interface IChannelService
 {
-    Task<IEnumerable<ChannelDto>> GetChannelsAsync();
+    Task<IEnumerable<ChannelDto>> GetChannelsAsync(Guid serverId);
     Task<ChannelDto> AddChannelAsync(CreateChannelDto createChannelDto);
 }
