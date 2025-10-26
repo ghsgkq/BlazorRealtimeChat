@@ -1,6 +1,7 @@
 ﻿@page "/"
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 
+@using System.Security.Claims
 @using System.Text.Json
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.AspNetCore.Components.Authorization
@@ -11,6 +12,7 @@
 @layout EmptyLayout
 @implements IAsyncDisposable
 
+@inject IAuthService AuthService
 @inject IServiceProvider ServiceProvider
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
@@ -80,8 +82,8 @@
             </ul>
         }
         <div class="user-profile mt-auto p-3 d-flex align-items-center">
-            <span class="bg-secondary rounded-circle me-2" style="width: 32px; height: 32px;"></span>
-            <span class="fw-bold">gregory</span>
+            <span class="bg-secondary rounded-circle me-2" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">@currentUsername?.Substring(0,1).ToUpper()</span>
+            <span class="fw-bold">@currentUsername</span>
         </div>
     </div>
 
@@ -129,7 +131,7 @@
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
-        currentUsername = authState.User.Identity?.Name ?? "Anonymous";
+        currentUsername = authState.User.FindFirst(ClaimTypes.Name)?.Value ?? "Anonymous";
 
         await InitializeSignalR();
         await LoadInitialServers();
@@ -170,6 +172,7 @@
     private async Task SelectServer(ServerDto server)
     {
         selectedServer = server;
+        selectedChannel = null; // 다른 서버 선택 시, 현재 선택된 채널을 초기화합니다.
         isLoadingChannels = true;
         channels = null; 
         StateHasChanged();
@@ -193,6 +196,11 @@
         {
             await SelectChannel(channels.First());
         }
+        else
+        {
+            // 채널이 없는 경우, UI를 한번 더 갱신하여 "채널을 선택하세요"가 표시되도록 합니다.
+            StateHasChanged();
+        }
     }
 
     private async Task SelectChannel(ChannelDto channel)
@@ -203,6 +211,7 @@
         selectedChannel = channel;
         chatMessages.Clear(); // 채널 변경 시 메시지 목록 초기화
         await hubConnection.SendAsync("JoinChannel", selectedChannel.ChannelId.ToString());
+        StateHasChanged(); // 채널 선택이 UI에 반영되도록 상태 변경을 알립니다.
     }
 
     private async Task HandleCreateServer()
@@ -292,3 +301,12 @@
         }
     }
 }
+
+<style>
+    .channel-item.selected {
+        background-color: var(--bs-secondary); /* Bootstrap의 secondary 색상을 사용 */
+    }
+    .channel-item:hover {
+        background-color: var(--bs-gray-700);
+    }
+</style>
