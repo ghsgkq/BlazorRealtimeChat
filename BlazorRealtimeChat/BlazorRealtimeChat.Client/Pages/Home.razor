@@ -131,7 +131,7 @@
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
-        currentUsername = authState.User.FindFirst(ClaimTypes.Name)?.Value ?? "Anonymous";
+        currentUsername = authState.User.FindFirst("name")?.Value ?? "Anonymous";
 
         await InitializeSignalR();
         await LoadInitialServers();
