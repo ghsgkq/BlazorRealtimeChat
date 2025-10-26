@@ -2,13 +2,17 @@
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 
 @using System.Text.Json
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Components.Authorization
 @using BlazorRealtimeChat.Client.Layout
 @using BlazorRealtimeChat.Client.Services
 @using BlazorRealtimeChat.Shared.DTOs
 
 @layout EmptyLayout
+@implements IAsyncDisposable
 
 @inject IServiceProvider ServiceProvider
+@inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @inject IServerService ServerService
 @inject IChannelService ChannelService
@@ -64,7 +68,7 @@
                 {
                     @foreach (var channel in channels)
                     {
-                        <li class="channel-item p-2 rounded">
+                        <li class="channel-item p-2 rounded @(selectedChannel == channel ? "selected" : "")" @onclick="() => SelectChannel(channel)">
                             <span># @channel.ChannelName</span>
                         </li>
                     }
@@ -84,19 +88,22 @@
     <!-- 3. 메인 콘텐츠 (채팅창) -->
     <div class="main-content d-flex flex-column flex-grow-1">
         <div class="chat-header p-3 border-bottom border-secondary">
-            <h5 class="mb-0 fw-bold"># 일반</h5>
+            <h5 class="mb-0 fw-bold"># @(selectedChannel?.ChannelName ?? "채널을 선택하세요")</h5>
         </div>
         <div class="chat-messages flex-grow-1 p-3" style="overflow-y: auto;">
-            <div class="d-flex mb-3">
-                <div class="flex-shrink-0"><span class="bg-secondary rounded-circle" style="width: 40px; height: 40px; display: block;"></span></div>
-                <div class="flex-grow-1 ms-3">
-                    <div class="fw-bold">User1</div>
-                    <div>안녕하세요! Blazor 채팅 앱에 오신 것을 환영합니다.</div>
+            @foreach (var message in chatMessages)
+            {
+                <div class="d-flex mb-3">
+                    <div class="flex-shrink-0"><span class="bg-secondary rounded-circle" style="width: 40px; height: 40px; display: block;"></span></div>
+                    <div class="flex-grow-1 ms-3">
+                        @((MarkupString)message)
+                    </div>
                 </div>
-            </div>
+            }
         </div>
         <div class="chat-input p-3 bg-dark-subtle">
-            <input type="text" class="form-control bg-dark text-light border-secondary" placeholder="# 일반에 메시지 보내기" />
+            <input type="text" class="form-control bg-dark text-light border-secondary" 
+                   placeholder="@($"# {selectedChannel?.ChannelName ?? ""}에 메시지 보내기")" @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
         </div>
     </div>
 </div>
@@ -104,12 +111,47 @@
 @code {
     private List<ServerDto> servers;
     private ServerDto selectedServer;
+    private ChannelDto selectedChannel;
     private List<ChannelDto> channels;
     private CreateChannelDto newChannel = new CreateChannelDto();
     private bool showAddChannelInput = false;
     private bool isLoadingChannels = false;
 
+    // --- 채팅 관련 필드 ---
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private HubConnection hubConnection;
+    private List<string> chatMessages = new List<string>();
+    private string messageInput;
+    private string currentUsername;
+    private bool isChatConnected => hubConnection?.State == HubConnectionState.Connected;
+
     protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateTask;
+        currentUsername = authState.User.Identity?.Name ?? "Anonymous";
+
+        await InitializeSignalR();
+        await LoadInitialServers();
+    }
+
+    private async Task InitializeSignalR()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var formattedMessage = $"<div class=\"fw-bold\">{user}</div><div>{message}</div>";
+            chatMessages.Add(formattedMessage);
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadInitialServers()
     {
         try
         {
@@ -145,6 +187,22 @@
         {
             isLoadingChannels = false;
         }
+
+        // 서버를 선택하면 첫 번째 채널을 자동으로 선택
+        if (channels != null && channels.Any())
+        {
+            await SelectChannel(channels.First());
+        }
+    }
+
+    private async Task SelectChannel(ChannelDto channel)
+    {
+        if (selectedChannel != null)
+            await hubConnection.SendAsync("LeaveChannel", selectedChannel.ChannelId.ToString());
+
+        selectedChannel = channel;
+        chatMessages.Clear(); // 채널 변경 시 메시지 목록 초기화
+        await hubConnection.SendAsync("JoinChannel", selectedChannel.ChannelId.ToString());
     }
 
     private async Task HandleCreateServer()
@@ -211,6 +269,26 @@
         else
         {
             await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "채널 생성에 실패했습니다.", "error");
+        }
+    }
+
+    private async Task HandleChatInput(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrEmpty(messageInput))
+        {
+            if (selectedChannel != null && isChatConnected)
+            {
+                await hubConnection.SendAsync("SendMessageToChannel", selectedChannel.ChannelId.ToString(), currentUsername, messageInput);
+                messageInput = string.Empty;
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
         }
     }
 }

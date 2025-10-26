@@ -10,16 +10,13 @@
 
   <ItemGroup>
     <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0-preview.7.24406.11" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorRealtimeChat.Shared\BlazorRealtimeChat.Shared.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Components\" />
   </ItemGroup>
 
 </Project>

@@ -2,10 +2,12 @@ using System.Text;
 using Blazored.LocalStorage;
 using BlazorRealtimeChat.Components;
 using BlazorRealtimeChat.Data;
+using BlazorRealtimeChat.Hubs;
 using BlazorRealtimeChat.Repositories;
 using ServerSideServices = BlazorRealtimeChat.Services;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -34,7 +36,6 @@ builder.Services.AddScoped<ServerSideServices.IChannelService, ServerSideService
 builder.Services.AddScoped<ServerSideServices.ITokenService, ServerSideServices.TokenService>();
 builder.Services.AddScoped<ServerSideServices.IServerService, ServerSideServices.ServerService>();
 
-
 // JWT 인증 서비스 등록
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -51,7 +52,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+
+// SignalIR 서비스 추가
+builder.Services.AddSignalR();
+
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        new[] { "application/octet-stream" });
+});
+
+
 var app = builder.Build();
+
+// 응답 압축 미들웨어 사용
+app.UseResponseCompression();
 
 if (app.Environment.IsDevelopment())
 {
@@ -73,6 +88,9 @@ app.UseAntiforgery();
 // 인증 및 권한 부여 미들웨어
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ChatHub 엔트포인트 매핑
+app.MapHub<ChatHub>("/chathub"); // "/chathub" 경로로 Hub에 접속할 수 있게 됩니다.
 
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()

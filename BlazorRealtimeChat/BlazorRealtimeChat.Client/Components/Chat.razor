@@ -1,0 +1,86 @@
+<h3>Chat</h3>
+
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+<div class="chat-container">
+    <ul id="messagesList">
+        @foreach (var message in _messages)
+        {
+            <li>@message</li>
+        }
+    </ul>
+</div>
+
+<div class="input-group">
+    <input @bind="userInput" placeholder="사용자 이름" />
+    <input @bind="messageInput" placeholder="메시지 입력..." @onkeyup="HandleEnterKey" />
+    <button @onclick="Send" disabled="@(!IsConnected)">전송</button>
+</div>
+
+
+@code {
+    private HubConnection? _hubConnection;
+    private List<string> _messages = new List<string>();
+    private string? userInput;
+    private string? messageInput;
+
+    public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 서버의 Hub 주소로 HubConnection을 생성합니다.
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+            .Build();
+        
+        // 서버에서 "ReceiveMessage"를 호출하면 실행될 로직을 정의합니다.
+        _hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMsg = $"{user}: {message}";
+            _messages.Add(encodedMsg);
+            InvokeAsync(StateHasChanged); // UI를 다시 렌더링하도록 요청
+        });
+
+        await _hubConnection.StartAsync();
+    }
+    
+    private async Task Send()
+    {
+        if (_hubConnection is not null && !string.IsNullOrEmpty(messageInput))
+        {
+            // 서버의 SendMessage 메서드를 호출합니다.
+            await _hubConnection.SendAsync("SendMessage", userInput, messageInput);
+            messageInput = string.Empty; // 입력창 비우기
+        }
+    }
+
+    // Enter 키를 눌렀을 때도 메시지를 전송하는 편의 기능
+    private async Task HandleEnterKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Send();
+        }
+    }
+
+    // 컴포넌트가 소멸될 때 Hub 연결을 안전하게 종료합니다.
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
+
+<style>
+    .chat-container {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+</style>
