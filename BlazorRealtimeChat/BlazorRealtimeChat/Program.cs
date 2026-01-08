@@ -65,8 +65,7 @@ builder.Services.AddResponseCompression(opts =>
 
 var app = builder.Build();
 
-// 응답 압축 미들웨어 사용
-app.UseResponseCompression();
+
 
 if (app.Environment.IsDevelopment())
 {
@@ -76,6 +75,8 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
+    // 응답 압축 미들웨어 사용
+    app.UseResponseCompression();
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }

@@ -1,7 +1,11 @@
 <h3>Chat</h3>
 
 @using Microsoft.AspNetCore.SignalR.Client
+@using Blazored.LocalStorage
+
+
 @inject NavigationManager NavigationManager
+@inject ILocalStorageService LocalStorage
 @implements IAsyncDisposable
 
 <div class="chat-container">
@@ -30,9 +34,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var token = await LocalStorage.GetItemAsStringAsync("authToken");
+
         // 서버의 Hub 주소로 HubConnection을 생성합니다.
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options =>
+        {
+            options.AccessTokenProvider = () => Task.FromResult(token);
+        })
             .Build();
         
         // 서버에서 "ReceiveMessage"를 호출하면 실행될 로직을 정의합니다.
@@ -50,8 +59,12 @@
     {
         if (_hubConnection is not null && !string.IsNullOrEmpty(messageInput))
         {
-            // 서버의 SendMessage 메서드를 호출합니다.
-            await _hubConnection.SendAsync("SendMessage", userInput, messageInput);
+            // 1. 서버의 메서드 이름과 정확히 일치시켜야 합니다: "SendMessageToChannel"
+            // 2. 서버가 요구하는 매개변수를 순서대로 넣어줍니다: channelId, user, message
+            string currentChannelId = "general"; // 예시 채널 ID
+
+            await _hubConnection.SendAsync("SendMessageToChannel", currentChannelId, userInput, messageInput);
+
             messageInput = string.Empty; // 입력창 비우기
         }
     }

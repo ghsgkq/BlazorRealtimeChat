@@ -3,7 +3,9 @@ using BlazorRealtimeChat.Shared.DTOs;
 
 namespace BlazorRealtimeChat.Services;
 
-public class ServerService(IServerRepository serverRepository) : IServerService
+public class ServerService(
+    IServerRepository serverRepository, 
+    IChannelRepository channelRepository) : IServerService
 {
     public async Task<IEnumerable<ServerDto>> GetServersAsync()
     {
@@ -17,14 +19,24 @@ public class ServerService(IServerRepository serverRepository) : IServerService
         });
     }
 
+    // 서버 생성
     public async Task<ServerDto> AddServerAsync(CreateServerDto createServerDto)
     {
+        // 1. 서버 생성
         var newServer = new Data.Entity.Server
         {
             ServerName = createServerDto.ServerName
         };
 
         var createdServer = await serverRepository.AddServerAsync(newServer);
+
+        // 2. 기본 채널 추가하기
+        var defaultChannel = new Data.Entity.Channel
+        {
+            ChannelName = "일반",
+            ServerId = createdServer.ServerId
+        };
+        await channelRepository.AddChannelAsync(defaultChannel);
 
         return new ServerDto
         {
