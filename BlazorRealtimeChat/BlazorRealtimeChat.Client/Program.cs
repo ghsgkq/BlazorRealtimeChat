@@ -40,5 +40,6 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRegisterService, RegisterService>();
 builder.Services.AddScoped<IChannelService, ChannelService>();
 builder.Services.AddScoped<IServerService, ServerService>(); // 새로 만든 서버 서비스를 등록합니다.
+builder.Services.AddScoped<IMessageService, MessageService>();
 
 await builder.Build().RunAsync();

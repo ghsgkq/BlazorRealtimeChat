@@ -29,12 +29,14 @@ builder.Services.AddDbContext<RealTimeChatContext>(options =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IChannelRepository, ChannelRepository>();
 builder.Services.AddScoped<IServerRepository, ServerRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 
 // Service 등록 시, 전체 네임스페이스 또는 별칭을 사용하여 혼동을 방지합니다.
 builder.Services.AddScoped<ServerSideServices.IUserService, ServerSideServices.UserService>();
 builder.Services.AddScoped<ServerSideServices.IChannelService, ServerSideServices.ChannelService>();
 builder.Services.AddScoped<ServerSideServices.ITokenService, ServerSideServices.TokenService>();
 builder.Services.AddScoped<ServerSideServices.IServerService, ServerSideServices.ServerService>();
+builder.Services.AddScoped<ServerSideServices.IMessageService, ServerSideServices.MessageService>();
 
 // JWT 인증 서비스 등록
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -1,3 +1,5 @@
+using BlazorRealtimeChat.Data.Entity;
+using BlazorRealtimeChat.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Threading.Tasks;
@@ -5,7 +7,7 @@ using System.Threading.Tasks;
 namespace BlazorRealtimeChat.Hubs
 {
     [Authorize] // 인증된 사용자만 허브에 연결할 수 있도록 합니다.
-    public class ChatHub : Hub
+    public class ChatHub(IMessageRepository messageRepository) : Hub
     {
         // 클라이언트가 채널에 참여하기 위해 호출하는 메소드
         public async Task JoinChannel(string channelId)
@@ -23,8 +25,23 @@ namespace BlazorRealtimeChat.Hubs
         // 클라이언트가 메시지를 보내기 위해 호출하는 메소드
         public async Task SendMessage(string channelId, string message)
         {
+   
+
             // Context.User.Identity.Name 등을 사용하여 사용자 이름을 가져올 수 있습니다.
             var userName = Context.User.Identity.Name ?? "Unknown User";
+            var userId = Context.UserIdentifier;
+
+            // 메시지 엔티티 생성 및 DB 저장
+            var newMessage = new Message
+            {
+                Content = message,
+                ChannelId = Guid.Parse(channelId),
+                UserId = Guid.Parse(userId ?? Guid.Empty.ToString()),
+                Timestamp = DateTime.UtcNow
+            };
+
+            // 메시지 추가
+            await messageRepository.AddMessageAsync(newMessage);
 
             // 메시지를 보낸 클라이언트를 제외한, 같은 그룹(채널)에 있는 모든 다른 클라이언트에게 메시지를 보냅니다.
             await Clients.Group(channelId).SendAsync("ReceiveMessage", userName, message);
