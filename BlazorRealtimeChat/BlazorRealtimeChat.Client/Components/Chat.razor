@@ -3,7 +3,6 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using Blazored.LocalStorage
 
-
 @inject NavigationManager NavigationManager
 @inject ILocalStorageService LocalStorage
 @implements IAsyncDisposable
@@ -18,82 +17,79 @@
 </div>
 
 <div class="input-group">
-    <input @bind="userInput" placeholder="사용자 이름" />
-    <input @bind="messageInput" placeholder="메시지 입력..." @onkeyup="HandleEnterKey" />
+    @* 사용자 이름 입력창은 서버(ChatHub)에서 토큰으로 직접 식별하므로 필요 없습니다. *@
+    <input @bind="messageInput" placeholder="@($"{SelectedChannelName ?? "채널"}에 메시지 입력...")"
+           @onkeyup="HandleEnterKey" disabled="@(!IsConnected)" />
     <button @onclick="Send" disabled="@(!IsConnected)">전송</button>
 </div>
 
-
 @code {
+    // [수정] 부모 컴포넌트로부터 현재 선택된 채널 정보를 받습니다.
+    [Parameter] public string? SelectedChannelId { get; set; }
+    [Parameter] public string? SelectedChannelName { get; set; }
+
     private HubConnection? _hubConnection;
     private List<string> _messages = new List<string>();
-    private string? userInput;
     private string? messageInput;
 
     public bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
     protected override async Task OnInitializedAsync()
     {
-        var token = await LocalStorage.GetItemAsStringAsync("authToken");
+        // GetItemAsync<string>을 권장합니다 (따옴표 문제 방지)
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
 
-        // 서버의 Hub 주소로 HubConnection을 생성합니다.
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options =>
-        {
-            options.AccessTokenProvider = () => Task.FromResult(token);
-        })
+            {
+                options.AccessTokenProvider = () => Task.FromResult(token);
+            })
+            .WithAutomaticReconnect()
             .Build();
-        
-        // 서버에서 "ReceiveMessage"를 호출하면 실행될 로직을 정의합니다.
+
         _hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
         {
             var encodedMsg = $"{user}: {message}";
             _messages.Add(encodedMsg);
-            InvokeAsync(StateHasChanged); // UI를 다시 렌더링하도록 요청
+            InvokeAsync(StateHasChanged);
         });
 
-        await _hubConnection.StartAsync();
+        try
+        {
+            await _hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Chat 연결 실패: {ex.Message}");
+        }
     }
-    
+
     private async Task Send()
     {
-        if (_hubConnection is not null && !string.IsNullOrEmpty(messageInput))
+        // [수정] SelectedChannelId가 있고 연결된 상태일 때만 전송합니다.
+        if (IsConnected && !string.IsNullOrEmpty(messageInput) && !string.IsNullOrEmpty(SelectedChannelId))
         {
-            // 1. 서버의 메서드 이름과 정확히 일치시켜야 합니다: "SendMessageToChannel"
-            // 2. 서버가 요구하는 매개변수를 순서대로 넣어줍니다: channelId, user, message
-            string currentChannelId = "general"; // 예시 채널 ID
-
-            await _hubConnection.SendAsync("SendMessageToChannel", currentChannelId, userInput, messageInput);
-
-            messageInput = string.Empty; // 입력창 비우기
+            try
+            {
+                // [수정] ChatHub.SendMessage(string channelId, string message) 규격에 맞춥니다.
+                // 서버가 유저 이름을 직접 추출하므로 userInput은 보내지 않습니다.
+                await _hubConnection!.SendAsync("SendMessage", SelectedChannelId, messageInput);
+                messageInput = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"메시지 전송 오류: {ex.Message}");
+            }
         }
     }
 
-    // Enter 키를 눌렀을 때도 메시지를 전송하는 편의 기능
     private async Task HandleEnterKey(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
-        {
-            await Send();
-        }
+        if (e.Key == "Enter") await Send();
     }
 
-    // 컴포넌트가 소멸될 때 Hub 연결을 안전하게 종료합니다.
     public async ValueTask DisposeAsync()
     {
-        if (_hubConnection is not null)
-        {
-            await _hubConnection.DisposeAsync();
-        }
+        if (_hubConnection is not null) await _hubConnection.DisposeAsync();
     }
 }
-
-<style>
-    .chat-container {
-        height: 300px;
-        overflow-y: auto;
-        border: 1px solid #ccc;
-        padding: 10px;
-        margin-bottom: 10px;
-    }
-</style>

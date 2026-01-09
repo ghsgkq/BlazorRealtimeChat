@@ -130,32 +130,33 @@
     private string? currentUsername;
     private bool isChatConnected => hubConnection?.State == HubConnectionState.Connected;
 
+    private Task? _signalRInitTask; // SignalR 초기화 상태를 추적하는 태스크
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
-        // JWT 클레임 타입 확인 : "name" 대신 ClaimTypes.Name을 쓴느 경우가 많으니 확인 필요
-        currentUsername = authState.User.FindFirst(ClaimTypes.Name)?.Value
-                          ?? authState.User.FindFirst("name")?.Value
-                          ?? "Annonymous";
+        currentUsername = authState.User.FindFirst("name")?.Value ?? "Anonymous";
 
-        // 두 작업을 동시에 시작하거나, 하나가 실패해도 다른 쪽은 실행되게 합니다.
-        _ = InitializeSignalR(); // 비동기로 던져두기 ( 채팅 연결은 배경에서)
-        await LoadInitialServers(); // 서버 목록 로딩은 반드시 기다리기
+        // 1. 초기화 태스크를 변수에 저장합니다. (await 하지 않고 바로 다음으로 넘어감)
+        _signalRInitTask = InitializeSignalR();
+
+        // 2. 서버 목록은 바로 불러옵니다.
+        await LoadInitialServers();
     }
 
     private async Task InitializeSignalR()
     {
-        var token = await LocalStorage.GetItemAsStringAsync("authToken");
-        if (string.IsNullOrEmpty(token)) return;
-
+        // 1. HubConnection 빌드 (기존과 동일)
         hubConnection = new HubConnectionBuilder()
             .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options =>
-        {
-            options.AccessTokenProvider = () => Task.FromResult(token);
-        })
-        .WithAutomaticReconnect() // 자동 재연결 기능 추가
+            {
+                options.AccessTokenProvider = async () =>
+                    await LocalStorage.GetItemAsync<string>("accessToken");
+            })
+            .WithAutomaticReconnect()
             .Build();
 
+        // 메시지 수신 핸들러 등록
         hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
         {
             var formattedMessage = $"<div class=\"fw-bold\">{user}</div><div>{message}</div>";
@@ -163,7 +164,26 @@
             InvokeAsync(StateHasChanged);
         });
 
-        await hubConnection.StartAsync();
+        try
+        {
+            // 2. 서버와 연결 시작
+            await hubConnection.StartAsync();
+            Console.WriteLine("SignalR 연결 성공!");
+
+            // [핵심] 연결이 완료되었음을 UI에 알려 input의 disabled를 해제합니다.
+            await InvokeAsync(StateHasChanged);
+
+            // [추가] 연결 전에 이미 채널이 선택되어 있었다면, 지금 서버에 Join을 요청합니다.
+            if (selectedChannel != null)
+            {
+                await hubConnection.SendAsync("JoinChannel", selectedChannel.ChannelId.ToString());
+                Console.WriteLine($"연결 후 채널 입장 완료: {selectedChannel.ChannelName}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR 연결 실패: {ex.Message}");
+        }
     }
 
     private async Task LoadInitialServers()
@@ -221,33 +241,41 @@
             StateHasChanged();
         }
     }
-
     private async Task SelectChannel(ChannelDto channel)
     {
-        // 1. hubConnection이 null이거나 연결 상태가 아닐 때는 호출하지 않도록 만듦
-        if (hubConnection == null || hubConnection.State != HubConnectionState.Connected)
+        if (channel == null) return;
+
+        // 1. hubConnection이 생성되었고 연결된 상태인지 먼저 확인합니다.
+        if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
         {
-            selectedChannel = channel; // 연결 전이라도 선택된 채널 상태는 변경
-            chatMessages.Clear();
-            Console.WriteLine("SignalR이 아직 연결되지 않았습니다. 메시지 전송을 건너뜁니다.");
-            return;
+            try
+            {
+                // 2. 기존에 선택된 채널이 있었다면 먼저 나갑니다.
+                if (selectedChannel != null)
+                {
+                    await hubConnection.SendAsync("LeaveChannel", selectedChannel.ChannelId.ToString());
+                }
+
+                selectedChannel = channel;
+                chatMessages.Clear();
+
+                // 3. 서버의 JoinChannel 메서드를 호출합니다.
+                await hubConnection.SendAsync("JoinChannel", selectedChannel.ChannelId.ToString());
+            }
+            catch (Exception ex)
+            {
+                // 여기서 에러가 나더라도 UI 상태는 업데이트하여 선택은 되게 합니다.
+                Console.WriteLine($"채널 입장 중 SignalR 오류: {ex.Message}");
+            }
         }
-        try
+        else
         {
-
-            if (selectedChannel != null)
-                await hubConnection.SendAsync("LeaveChannel", selectedChannel.ChannelId.ToString());
-
+            // 연결 전이라면 화면에 표시할 데이터만 업데이트합니다.
             selectedChannel = channel;
-            chatMessages.Clear(); // 채널 변경 시 메시지 목록 초기화
-            await hubConnection.SendAsync("JoinChannel", selectedChannel.ChannelId.ToString());
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"채널 변경 중 SignalR 오류: {ex.Message}");
+            chatMessages.Clear();
         }
 
-        StateHasChanged(); // 채널 선택이 UI에 반영되도록 상태 변경을 알립니다.
+        StateHasChanged();
     }
 
     private async Task HandleCreateServer()
@@ -321,9 +349,12 @@
     {
         if (e.Key == "Enter" && !string.IsNullOrEmpty(messageInput))
         {
-            if (selectedChannel != null && isChatConnected)
+            // 연결 상태를 확인하여 안전하게 전송합니다.
+            if (selectedChannel != null && hubConnection?.State == HubConnectionState.Connected)
             {
-                await hubConnection.SendAsync("SendMessageToChannel", selectedChannel.ChannelId.ToString(), currentUsername, messageInput);
+                // [중요] 서버의 SendMessage는 (channelId, message) 2개만 받습니다!
+                // 사용자 이름은 서버가 토큰에서 직접 추출하므로 보낼 필요가 없습니다.
+                await hubConnection.SendAsync("SendMessage", selectedChannel.ChannelId.ToString(), messageInput);
                 messageInput = string.Empty;
             }
         }
