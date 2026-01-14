@@ -48,3 +48,36 @@
     width: 240px;
     background-color: #2f3136; /* 디스코드 채널 목록 배경색 */
 }
+
+/* 채팅 메시지 디자인 개선 */
+.chat-messages {
+    background-color: #313338; /* 다크 모드 배경 */
+    color: #dcdee1;
+}
+
+.message-bubble {
+    background-color: #383a40;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: fit-content;
+}
+
+.chat-image, .chat-video {
+    max-width: 400px;
+    max-height: 300px;
+    border-radius: 8px;
+    margin-top: 5px;
+    display: block;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+    .chat-image:hover {
+        transform: scale(1.02);
+    }
+
+/* 드롭 존 시각 효과 */
+.drag-over {
+    border: 2px dashed #5865f2 !important;
+    background-color: rgba(88, 101, 243, 0.1) !important;
+}

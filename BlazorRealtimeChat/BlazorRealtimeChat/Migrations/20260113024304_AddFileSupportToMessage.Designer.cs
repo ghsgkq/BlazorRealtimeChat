@@ -3,6 +3,7 @@ using System;
 using BlazorRealtimeChat.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorRealtimeChat.Migrations
 {
     [DbContext(typeof(RealTimeChatContext))]
-    partial class RealTimeChatContextModelSnapshot : ModelSnapshot
+    [Migration("20260113024304_AddFileSupportToMessage")]
+    partial class AddFileSupportToMessage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

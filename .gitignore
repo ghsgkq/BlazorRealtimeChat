@@ -66,3 +66,5 @@ secrets.json
 
 Windows thumbnails
 Thumbs.db
+/BlazorRealtimeChat/BlazorRealtimeChat/wwwroot/uploads
+/BlazorRealtimeChat/BlazorRealtimeChat/ExternalUploads

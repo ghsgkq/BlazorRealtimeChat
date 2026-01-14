@@ -35,6 +35,7 @@ namespace BlazorRealtimeChat.Hubs
             var newMessage = new Message
             {
                 Content = message,
+                FileUrl = null,
                 ChannelId = Guid.Parse(channelId),
                 UserId = Guid.Parse(userId ?? Guid.Empty.ToString()),
                 Timestamp = DateTime.UtcNow
@@ -45,6 +46,41 @@ namespace BlazorRealtimeChat.Hubs
 
             // 메시지를 보낸 클라이언트를 제외한, 같은 그룹(채널)에 있는 모든 다른 클라이언트에게 메시지를 보냅니다.
             await Clients.Group(channelId).SendAsync("ReceiveMessage", userName, message);
+        }
+
+        // 파일 메시지를 보내기 위해 호출하는 메소드
+        public async Task SendMessageWithFile(string channelId, string fileUrl, string messageType)
+        {
+            try
+            {
+                var userName = Context.User.Identity.Name ?? "Unknown User";
+
+                // 현재 TokenService는 'sub'에 Username을 넣고 있습니다.
+                var userId = Context.UserIdentifier;
+
+                Console.WriteLine($"[Debug] User: {userName}, ID: {userId}, Channel: {channelId}");
+
+                var newMessage = new Message
+                {
+                    Content = messageType == "image" ? "이미지를 보냈습니다." : "동영상을 보냈습니다.",
+                    FileUrl = fileUrl,
+                    MessageType = messageType,
+                    ChannelId = Guid.Parse(channelId),
+                    UserId = Guid.Parse(userId ?? Guid.Empty.ToString()),
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await messageRepository.AddMessageAsync(newMessage);
+
+                await Clients.Group(channelId).SendAsync("ReceiveMessageWithFile", userName, fileUrl, messageType);
+            }
+            catch (Exception ex)
+            {
+                // 서버 콘솔(검은 창)에 에러 내용이 자세히 출력됩니다.
+                Console.WriteLine($"[ChatHub Error] {ex.Message}");
+                Console.WriteLine($"[Stack Trace] {ex.StackTrace}");
+                throw; // 에러를 다시 던져서 필요시 서버 로그 시스템에 기록되게 합니다.
+            }
         }
     }
 }

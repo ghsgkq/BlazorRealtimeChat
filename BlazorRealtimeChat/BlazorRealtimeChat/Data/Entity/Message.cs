@@ -14,6 +14,12 @@ public class Message
 
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
+    // -- 추가 필드 -- ( 파일 )
+    public string? FileUrl { get; set; } // 첨부 파일 URL
+    public string MessageType { get; set; } = "text"; // 메시지 유형 (예: text, image, file)
+
+    // ---------------
+
     // --- User와의 관계 (N:1) ---
     public Guid UserId { get; set; } // 작성자 외래 키
 

@@ -15,5 +15,9 @@ namespace BlazorRealtimeChat.Shared.DTOs;
         public string? UserName { get; set; } = null!;
         public Guid ChannelId { get; set; }
         public string? ChannelName { get; set; } = null;
-    }
+        
+        // -- 추가된 필드 ---
+        public string? FileUrl { get; set; } = null;
+        public string MessageType { get; set; } = "text";
+}
 

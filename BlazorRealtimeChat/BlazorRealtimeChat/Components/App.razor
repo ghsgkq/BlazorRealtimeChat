@@ -20,15 +20,64 @@
     <Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
     <script src="_framework/blazor.web.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-</body>
 
-<script>
-     // 스크롤을 최하단으로 이동시키는 함수
-     window.scrollToBottom = (element) => {
-        if (element) {
-            element.scrollTop = element.scrollHeight;
+    <script>
+         // 스크롤을 최하단으로 이동시키는 함수
+         window.scrollToBottom = (element) => {
+            if (element) {
+                element.scrollTop = element.scrollHeight;
+            }
+        };
+
+        window.setupFileUpload = (dotNetHelper, elementId) => {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            // 붙여넣기(Paste) 처리
+            element.addEventListener('paste', async (e) => {
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1 || items[i].type.indexOf('video') !== -1) {
+                        const file = items[i].getAsFile();
+                        await uploadFileFromJS(dotNetHelper, file);
+                    }
+                }
+            });
+
+            // 드롭(Drop) 처리
+            element.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                element.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    await uploadFileFromJS(dotNetHelper, files[0]);
+                }
+            });
+
+            element.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                element.classList.add('drag-over');
+            });
+
+            element.addEventListener('dragleave', () => {
+                element.classList.remove('drag-over');
+            });
+        };
+
+        window.clickElementById = (id) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.click();
+            }
+        };
+
+        async function uploadFileFromJS(dotNetHelper, file) {
+            // 파일을 바이트 배열로 변환하여 C#으로 전달
+            const arrayBuffer = await file.arrayBuffer();
+            const byteArray = new Uint8Array(arrayBuffer);
+            await dotNetHelper.invokeMethodAsync('HandleFileFromJS', byteArray, file.name, file.type);
         }
-    };
-</script>
+    </script>
+</body>
 
 </html>

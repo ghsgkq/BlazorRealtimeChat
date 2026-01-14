@@ -21,6 +21,7 @@
 @inject IChannelService ChannelService
 @inject ILocalStorageService LocalStorage
 @inject IMessageService messageService
+@inject IFileService fileService
 
 <div class="d-flex home-container">
     <!-- 1. 서버 목록 사이드바 -->
@@ -92,23 +93,35 @@
 
     <!-- 3. 메인 콘텐츠 (채팅창) -->
     <div class="main-content d-flex flex-column flex-grow-1">
-        <div class="chat-header p-3 border-bottom border-secondary">
-            <h5 class="mb-0 fw-bold"># @(selectedChannel?.ChannelName ?? "채널을 선택하세요")</h5>
-        </div>
         <div class="chat-messages flex-grow-1 p-3" @ref="chatMessagesBox" style="overflow-y: auto;">
             @foreach (var message in chatMessages)
             {
                 <div class="d-flex mb-3">
-                    <div class="flex-shrink-0"><span class="bg-secondary rounded-circle" style="width: 40px; height: 40px; display: block;"></span></div>
+                    <div class="flex-shrink-0">
+                        <span class="bg-secondary rounded-circle" style="width: 40px; height: 40px; display: block;"></span>
+                    </div>
                     <div class="flex-grow-1 ms-3">
                         @((MarkupString)message)
                     </div>
                 </div>
             }
         </div>
+
         <div class="chat-input p-3 bg-dark-subtle">
-            <input type="text" class="form-control bg-dark text-light border-secondary" 
-                   placeholder="@($"# {selectedChannel?.ChannelName ?? ""}에 메시지 보내기")" @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
+            <div class="input-group">
+                @* 1. InputFile은 그대로 두되, ID를 확실히 지정합니다 *@
+                <InputFile OnChange="HandleFileSelected" id="fileInput" style="display:none;" />
+
+                @* 2. button 대신 label을 사용합니다. for="fileInput"이 핵심입니다! *@
+                @* 이 label을 클릭하면 브라우저가 알아서 ID가 fileInput인 요소를 클릭해줍니다. *@
+                <label for="fileInput" class="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center" style="cursor: pointer; width: 45px;">
+                    +
+                </label>
+
+                <input type="text" id="msgInput" class="form-control bg-dark text-light border-secondary"
+                       placeholder="@($"# {selectedChannel?.ChannelName ?? ""}에 메시지 보내기")"
+                       @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
+            </div>
         </div>
     </div>
 </div>
@@ -134,6 +147,8 @@
     private Task? _signalRInitTask; // SignalR 초기화 상태를 추적하는 태스크
 
     private ElementReference chatMessagesBox; // 채팅 Dom 참조
+
+    private DotNetObjectReference<Home>? _objRef; // 필드로 선언
 
     protected override async Task OnInitializedAsync()
     {
@@ -162,11 +177,22 @@
         // 메시지 수신 핸들러 등록
         hubConnection.On<string, string>("ReceiveMessage", async (user, message) =>
         {
-            var formattedMessage = $"<div class=\"fw-bold\">{user}</div><div>{message}</div><div style=\"color : gray;\">{DateTime.Now}</div>";
+            var formattedMessage = FormatMessage(user, "text", "", DateTime.Now, message);
             chatMessages.Add(formattedMessage);
             await InvokeAsync(StateHasChanged);
             // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
             await ScrollToBottomChatMessagesBox();
+        });
+
+        // 파일 메시지 수신 핸들러 등록
+        hubConnection.On<string, string, string>("ReceiveMessageWithFile", async (userName, fileUrl, messageType) =>
+        {
+            var fileMessageHtml = FormatMessage(userName, messageType, fileUrl, DateTime.Now, "");
+            chatMessages.Add(fileMessageHtml);
+            await InvokeAsync(StateHasChanged);
+            // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
+            await ScrollToBottomChatMessagesBox();
+
         });
 
         try
@@ -268,7 +294,12 @@
                 var history = await messageService.GetMessagesByChannelIdAsync(channel.ChannelId);
                 foreach (var msg in history)
                 {
-                    var formattedMessage = $"<div class=\"fw-bold\">{msg.UserName}</div><div>{msg.Content}</div><div style=\"color : gray;\">{msg.Timestamp}</div>";
+                    var formattedMessage = FormatMessage(
+                        msg.UserName,
+                        msg.MessageType,
+                        msg.FileUrl,
+                        msg.Timestamp,
+                        msg.Content);
                     chatMessages.Add(formattedMessage);                  
                 }
 
@@ -384,12 +415,83 @@
         await JSRuntime.InvokeVoidAsync("scrollToBottom", chatMessagesBox);
     }
 
+    // 파일 선택 핸들러
+    public async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        // 파일 크기 체크 (예: 100MB 제한)
+        long maxAllowedSize = 100 * 1024 * 1024;
+        if (file.Size > maxAllowedSize)
+        {
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "경고", "파일 크기가 너무 큽니다. (최대 100MB)", "warning");
+            return;
+        }
+
+        try
+        {
+            // 파일 업로드 호출
+            // 주의: fileService.UploadFileAsync 내부에서 stream을 열 때
+            // file.OpenReadStream(maxAllowedSize) 처럼 크기를 인자로 전달해야 합니다.
+            var uploadedFileDto = await fileService.UploadFileAsync(file);
+
+            if (uploadedFileDto != null && selectedChannel != null && hubConnection?.State == HubConnectionState.Connected)
+            {
+                string messageType = file.ContentType.Contains("image") ? "image" :
+                                     file.ContentType.Contains("video") ? "video" : "file";
+
+                await hubConnection.SendAsync("SendMessageWithFile",
+                    selectedChannel.ChannelId.ToString(),
+                    uploadedFileDto.FileUrl,
+                    messageType);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "업로드에 실패했거나 연결이 끊어졌습니다.", "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            // 서버가 꺼지는 경우 여기도 도달하지 못할 수 있습니다.
+            // 이는 서버의 Program.cs 설정이 우선적으로 해결되어야 함을 의미합니다.
+            Console.WriteLine($"업로드 에러: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "치명적 오류", $"파일 처리 중 오류 발생: {ex.Message}", "error");
+        }
+    }
+
+    private string FormatMessage(string userName, string type, string fileUrl, DateTime timestamp, string message)
+    {
+        var header = $"<div class='fw-bold'>{userName}</div>";
+        var time = $"<div style='color:gray; font-size:0.8rem;'>{timestamp}</div>";
+
+        if (type == "image")
+            return $"{header}<div><img src='{fileUrl}' style='max-width:300px; border-radius:8px;' /></div>{time}";
+
+        if (type == "video")
+            return $"{header}<div><video src='{fileUrl}' controls style='max-width:300px;' /></div>{time}";
+
+        return $"{header}<div>{message}</div>{time}";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            //이미 생성되어 있다면 재사용하거나 기존 것을 해제합니다.
+            _objRef?.Dispose();
+            _objRef = DotNetObjectReference.Create(this);
+
+            await JSRuntime.InvokeVoidAsync("setupFileUpload", _objRef, "msgInput");
+        }
+    }
+
+
+    // IAsyncDisposable 구현 부분 수정
     public async ValueTask DisposeAsync()
     {
-        if (hubConnection is not null)
-        {
-            await hubConnection.DisposeAsync();
-        }
+        _objRef?.Dispose(); // [중요] 생성한 참조를 반드시 해제합니다.
+        if (hubConnection is not null) await hubConnection.DisposeAsync();
     }
 }
 

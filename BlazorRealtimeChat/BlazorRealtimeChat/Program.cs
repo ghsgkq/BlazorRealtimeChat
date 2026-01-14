@@ -1,15 +1,16 @@
-using System.Text;
 using Blazored.LocalStorage;
 using BlazorRealtimeChat.Components;
 using BlazorRealtimeChat.Data;
 using BlazorRealtimeChat.Hubs;
 using BlazorRealtimeChat.Repositories;
-using ServerSideServices = BlazorRealtimeChat.Services;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using ServerSideServices = BlazorRealtimeChat.Services;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,12 +76,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 
 // SignalIR 서비스 추가
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 100 * 1024 * 1024; // 10MB로 확장
+});
 
 builder.Services.AddResponseCompression(opts =>
 {
     opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
         new[] { "application/octet-stream" });
+});
+
+// Kestrel 서버 제한 해제 (예: 100MB)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 100 * 1024 * 1024;
+});
+
+// FormOptions 제한 해제
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartBodyLengthLimit = 100 * 1024 * 1024; // 100MB
 });
 
 
@@ -93,6 +110,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
     app.UseWebAssemblyDebugging();
+    app.UseDeveloperExceptionPage();
 }
 else
 {
@@ -106,6 +124,16 @@ app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 app.UseAntiforgery();
+
+// [추가] 외부 폴더인 ExternalUploads를 /user-files 경로로 서빙합니다.
+var externalPath = Path.Combine(Directory.GetCurrentDirectory(), "ExternalUploads");
+if (!Directory.Exists(externalPath)) Directory.CreateDirectory(externalPath);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(externalPath),
+    RequestPath = "/user-files"
+});
 
 // 인증 및 권한 부여 미들웨어
 app.UseAuthentication();
