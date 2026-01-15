@@ -25,5 +25,19 @@ namespace BlazorRealtimeChat.Client.Services
 
             return (await response.Content.ReadFromJsonAsync<FileDto>())!;
         }
+        public async Task<FileDto> UploadFileAsync(Stream fileStream, string fileName, string contentType)
+        {
+            using var content = new MultipartFormDataContent();
+            // 전달받은 스트림을 직접 StreamContent로 변환
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+            content.Add(fileContent, "file", fileName);
+
+            var response = await _httpClient.PostAsync("api/files/upload", content);
+            response.EnsureSuccessStatusCode();
+
+            return (await response.Content.ReadFromJsonAsync<FileDto>())!;
+
+        }
     }
 }

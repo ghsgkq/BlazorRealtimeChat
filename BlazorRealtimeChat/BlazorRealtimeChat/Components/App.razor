@@ -46,13 +46,15 @@
 
             // 드롭(Drop) 처리
             element.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                element.classList.remove('drag-over');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    await uploadFileFromJS(dotNetHelper, files[0]);
-                }
-            });
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                // 파일을 스트림 참조로 변환
+                const streamRef = DotNet.createJSStreamReference(file);
+                // [중요] C#의 매개변수 순서(fileName, contentType, streamRef)와 일치하게 보냅니다.
+                await dotNetHelper.invokeMethodAsync('HandleFileFromJS', file.name, file.type, streamRef);
+            }
+        });
 
             element.addEventListener('dragover', (e) => {
                 e.preventDefault();

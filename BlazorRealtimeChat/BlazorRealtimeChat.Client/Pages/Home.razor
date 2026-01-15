@@ -9,6 +9,7 @@
 @using BlazorRealtimeChat.Client.Services
 @using BlazorRealtimeChat.Shared.DTOs
 @using Blazored.LocalStorage
+@using Microsoft.JSInterop
 
 @layout EmptyLayout
 @implements IAsyncDisposable
@@ -239,6 +240,7 @@
         selectedChannel = null; // 다른 서버 선택 시, 현재 선택된 채널을 초기화합니다.
         isLoadingChannels = true;
         channels = new List<ChannelDto>(); 
+        chatMessages.Clear();
         StateHasChanged();
 
         try
@@ -462,16 +464,20 @@
 
     private string FormatMessage(string userName, string type, string fileUrl, DateTime timestamp, string message)
     {
-        var header = $"<div class='fw-bold'>{userName}</div>";
-        var time = $"<div style='color:gray; font-size:0.8rem;'>{timestamp}</div>";
+        var header = $"<div class='fw-bold' style='color: #00d1b2;'>{userName}</div>";
+        var time = $"<div style='color:gray; font-size:0.75rem;'>{timestamp.ToLocalTime():HH:mm}</div>";
 
         if (type == "image")
-            return $"{header}<div><img src='{fileUrl}' style='max-width:300px; border-radius:8px;' /></div>{time}";
+            return $"{header}<div><img src='{fileUrl}' style='max-width:350px; border-radius:12px; margin: 5px 0; border: 1px solid #444;' /></div>{time}";
 
         if (type == "video")
-            return $"{header}<div><video src='{fileUrl}' controls style='max-width:300px;' /></div>{time}";
+            return $"{header}<div><video src='{fileUrl}' controls style='max-width:350px; border-radius:12px; margin: 5px 0;' /></div>{time}";
 
-        return $"{header}<div>{message}</div>{time}";
+        // 일반 파일인 경우 다운로드 링크 제공
+        if (type == "file")
+            return $"{header}<div><a href='{fileUrl}' target='_blank' class='btn btn-sm btn-outline-info'>📎 파일 다운로드</a></div>{time}";
+
+        return $"{header}<div class='mt-1'>{message}</div>{time}";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -483,6 +489,39 @@
             _objRef = DotNetObjectReference.Create(this);
 
             await JSRuntime.InvokeVoidAsync("setupFileUpload", _objRef, "msgInput");
+        }
+    }
+
+    // javascript에서 호출할 메서드 예시
+    [JSInvokable]
+    public async Task HandleFileFromJS(string fileName, string contentType, IJSStreamReference streamRef)
+    {
+        try
+        {
+            // JS로부터 스트림 열기 ( 최대 100MB)
+            using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: 100 * 1024 * 1024);
+            // 파일 업로드 서비스 호출 (새로 만든 오버로드 사용)
+            var uploadedFileDto = await fileService.UploadFileAsync(stream, fileName, contentType);
+
+            if(uploadedFileDto != null && selectedChannel != null && hubConnection?.State == HubConnectionState.Connected)
+            {
+                string messageType = contentType.Contains("image") ? "image" :
+                                     contentType.Contains("video") ? "video" : "file";
+                await hubConnection.SendAsync("SendMessageWithFile",
+                    selectedChannel.ChannelId.ToString(),
+                    uploadedFileDto.FileUrl,
+                    messageType);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "드래그 앤 드랍 업로드에 실패했거나 연결이 끊어졌습니다.", "error");
+            }
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"드래그 앤 드랍 업로드 에러: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "드래그 앤 드랍 업로드 중 오류가 발생했습니다.", "error");
         }
     }
 
