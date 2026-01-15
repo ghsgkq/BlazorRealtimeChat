@@ -53,6 +53,17 @@
 .chat-messages {
     background-color: #313338; /* 다크 모드 배경 */
     color: #dcdee1;
+    overflow-y: auto;
+    /*  브라우저가 스크롤 위치를 하단에 고정하도록 돕는 속성 */
+    overflow-anchor: auto !important;
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* 메시지들 사이에 간격을 주어 가독성 향상 */
+.chat-messages > div:last-child {
+    overflow-anchor: auto;
 }
 
 .message-bubble {

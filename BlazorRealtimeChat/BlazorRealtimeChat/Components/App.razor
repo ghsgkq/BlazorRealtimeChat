@@ -24,9 +24,27 @@
     <script>
          // 스크롤을 최하단으로 이동시키는 함수
          window.scrollToBottom = (element) => {
-            if (element) {
+            if (!element) return;
+
+            // 스크롤을 끝으로 내리는 내부 함수
+            const doScroll = () => {
                 element.scrollTop = element.scrollHeight;
-            }
+            };
+
+            // 즉시 스코를 수행
+            doScroll();
+
+                // 현재 요소 내의 모든 이미지와 비디오가 로드될 때마다 스크롤 다시 수행 (핵심!)
+            const mediaElements = element.querySelectorAll('img, video');
+            mediaElements.forEach(media => {
+            // 이미 로드된 경우를 대비해 이벤트 리스너 등록
+                media.addEventListener('load', doScroll, { once: true });
+                media.addEventListener('loadeddata', doScroll, { once: true });
+            });
+
+            // 브라우저 렌더링 타이밍을 고려해 아주 짧은 지연 후 다시 한 번 수행
+            setTimeout(doScroll, 100);
+
         };
 
         window.setupFileUpload = (dotNetHelper, elementId) => {
