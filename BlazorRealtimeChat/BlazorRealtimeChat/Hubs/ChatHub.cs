@@ -23,7 +23,7 @@ namespace BlazorRealtimeChat.Hubs
         }
 
         // 클라이언트가 메시지를 보내기 위해 호출하는 메소드
-        public async Task SendMessage(string channelId, string message)
+        public async Task SendMessage(string channelId, string userProfileUrl, string message)
         {
    
 
@@ -45,11 +45,11 @@ namespace BlazorRealtimeChat.Hubs
             await messageRepository.AddMessageAsync(newMessage);
 
             // 메시지를 보낸 클라이언트를 제외한, 같은 그룹(채널)에 있는 모든 다른 클라이언트에게 메시지를 보냅니다.
-            await Clients.Group(channelId).SendAsync("ReceiveMessage", userName, message);
+            await Clients.Group(channelId).SendAsync("ReceiveMessage", userName, userProfileUrl, message);
         }
 
         // 파일 메시지를 보내기 위해 호출하는 메소드
-        public async Task SendMessageWithFile(string channelId, string fileUrl, string messageType)
+        public async Task SendMessageWithFile(string channelId,string userProfileUrl, string fileUrl, string messageType)
         {
             try
             {
@@ -72,7 +72,7 @@ namespace BlazorRealtimeChat.Hubs
 
                 await messageRepository.AddMessageAsync(newMessage);
 
-                await Clients.Group(channelId).SendAsync("ReceiveMessageWithFile", userName, fileUrl, messageType);
+                await Clients.Group(channelId).SendAsync("ReceiveMessageWithFile", userName, userProfileUrl, fileUrl, messageType);
             }
             catch (Exception ex)
             {

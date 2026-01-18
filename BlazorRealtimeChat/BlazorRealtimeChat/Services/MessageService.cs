@@ -18,7 +18,8 @@ namespace BlazorRealtimeChat.Services
                 ChannelName = m.Channel.ChannelName,
                 UserName = m.User.UserName,
                 FileUrl = m.FileUrl,
-                MessageType = m.MessageType
+                MessageType = m.MessageType,
+                ProfileImageUrl = m.User.ProfileImageUrl
             });
         }
     }

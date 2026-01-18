@@ -15,6 +15,9 @@ public class User
     [Required]
     public string PasswordHash { get; set; } = string.Empty; // 비밀번호 해시해서 저장합니다.
 
+    // 프로필 이미지 URL
+    public string? ProfileImageUrl { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // 관계 설정: 한 명의 유저는 여러 개의 메시지를 작성할 수 있습니다. ( @OneToMany )

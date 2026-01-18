@@ -1,7 +1,11 @@
-using System;
+using BlazorRealtimeChat.Data.Entity;
 using BlazorRealtimeChat.Services;
 using BlazorRealtimeChat.Shared.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Security.Claims;
 
 namespace BlazorRealtimeChat.Controllers;
 
@@ -46,7 +50,21 @@ public class UserController(IUserService userService, ITokenService tokenService
             AccessToken = accessToken,
             RefreshToken = refreshToken,
         });
-        
+    }
+
+    [Authorize]
+    [HttpPatch("update-profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] string imageUrl)
+    {
+        // 토큰에서 현재 사용자의 uuid 를 가져온다.
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        // UserService 를 통해 DB의 ProfileImageUrl 업데이트
+        var result = await userService.UpdateProfileImageAsync(Guid.Parse(userId), imageUrl);
+
+        return result.Success ? Ok(new {Message = "프로필 업데이트 성공"}) : BadRequest("프로필 업데이트 실패");
     }
 
 }

@@ -19,5 +19,6 @@ namespace BlazorRealtimeChat.Shared.DTOs;
         // -- 추가된 필드 ---
         public string? FileUrl { get; set; } = null;
         public string MessageType { get; set; } = "text";
+        public string? ProfileImageUrl { get; set; } = null;
 }
 

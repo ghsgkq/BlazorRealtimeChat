@@ -23,6 +23,7 @@
 @inject ILocalStorageService LocalStorage
 @inject IMessageService messageService
 @inject IFileService fileService
+@inject IUserService userService
 
 <div class="d-flex home-container">
     <!-- 1. 서버 목록 사이드바 -->
@@ -86,10 +87,24 @@
                 }
             </ul>
         }
-        <div class="user-profile mt-auto p-3 d-flex align-items-center">
-            <span class="bg-secondary rounded-circle me-2" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">@currentUsername?.Substring(0,1).ToUpper()</span>
+        <label for="profileInput" class="user-profile mt-auto p-3 d-flex align-items-center" style="cursor: pointer; width: 100%;">
+            @if (!string.IsNullOrEmpty(currentProfileUrl))
+            {
+                <img src="@currentProfileUrl" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;" />
+            }
+            else
+            {
+                <span class="bg-primary rounded-circle me-2 text-white fw-bold"
+                      style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">
+                    @currentUsername?.Substring(0, 1).ToUpper()
+                </span>
+            }
             <span class="fw-bold">@currentUsername</span>
-        </div>
+
+            @* 2. InputFile은 label 바깥 혹은 안쪽 어디에 있어도 id만 일치하면 작동합니다. 
+          중요: label 안에 있을 때 클릭 이벤트가 꼬이지 않도록 스타일로 숨깁니다. *@
+            <InputFile OnChange="HandleProfileImageUpload" id="profileInput" style="display:none;" />
+        </label>
     </div>
 
     <!-- 3. 메인 콘텐츠 (채팅창) -->
@@ -98,12 +113,7 @@
             @foreach (var message in chatMessages)
             {
                 <div class="d-flex mb-3">
-                    <div class="flex-shrink-0">
-                        <span class="bg-secondary rounded-circle" style="width: 40px; height: 40px; display: block;"></span>
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        @((MarkupString)message)
-                    </div>
+                    @((MarkupString)message)
                 </div>
             }
         </div>
@@ -151,6 +161,8 @@
 
     private DotNetObjectReference<Home>? _objRef; // 필드로 선언
 
+    private string? currentProfileUrl; // 현재 사용자의 프로필 URL
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
@@ -176,9 +188,9 @@
             .Build();
 
         // 메시지 수신 핸들러 등록
-        hubConnection.On<string, string>("ReceiveMessage", async (user, message) =>
+        hubConnection.On<string, string, string>("ReceiveMessage", async (user, userProfileUrl,message) =>
         {
-            var formattedMessage = FormatMessage(user, "text", "", DateTime.Now, message);
+            var formattedMessage = FormatMessage(user,userProfileUrl, "text", "", DateTime.Now, message);
             chatMessages.Add(formattedMessage);
             await InvokeAsync(StateHasChanged);
             // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
@@ -186,9 +198,9 @@
         });
 
         // 파일 메시지 수신 핸들러 등록
-        hubConnection.On<string, string, string>("ReceiveMessageWithFile", async (userName, fileUrl, messageType) =>
+        hubConnection.On<string, string, string, string>("ReceiveMessageWithFile", async (userName,userProfileUrl, fileUrl, messageType) =>
         {
-            var fileMessageHtml = FormatMessage(userName, messageType, fileUrl, DateTime.Now, "");
+            var fileMessageHtml = FormatMessage(userName, userProfileUrl, messageType, fileUrl, DateTime.Now, "");
             chatMessages.Add(fileMessageHtml);
             await InvokeAsync(StateHasChanged);
             // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
@@ -299,6 +311,7 @@
                 {
                     var formattedMessage = FormatMessage(
                         msg.UserName,
+                        msg.ProfileImageUrl,
                         msg.MessageType,
                         msg.FileUrl,
                         msg.Timestamp,
@@ -406,7 +419,7 @@
             {
                 // [중요] 서버의 SendMessage는 (channelId, message) 2개만 받습니다!
                 // 사용자 이름은 서버가 토큰에서 직접 추출하므로 보낼 필요가 없습니다.
-                await hubConnection.SendAsync("SendMessage", selectedChannel.ChannelId.ToString(), messageInput);
+                await hubConnection.SendAsync("SendMessage", selectedChannel.ChannelId.ToString(),currentProfileUrl, messageInput);
                 messageInput = string.Empty;
             }
         }
@@ -463,22 +476,27 @@
         }
     }
 
-    private string FormatMessage(string userName, string type, string fileUrl, DateTime timestamp, string message)
+    private string FormatMessage(string? userName, string? userProfileUrl, string type, string? fileUrl, DateTime timestamp, string? message)
     {
-        var header = $"<div class='fw-bold' style='color: #00d1b2;'>{userName}</div>";
+        // 프로필 이미지가 없으면 기본 원형 안에 첫 글자 표시
+        var avatar = !string.IsNullOrEmpty(userProfileUrl)
+            ? $"<img src='{userProfileUrl}' class='rounded-circle' style='width: 40px; height: 40px; object-fit: cover;' />"
+            : $"<div class='bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white' style='width: 40px; height: 40px;'>{userName[0]}</div>";
+
+        var header = $"<div class='d-flex align-items-center mb-1'><div class='fw-bold' style='color: #00d1b2;'>{userName}</div></div>";
         var time = $"<div style='color:gray; font-size:0.75rem;'>{timestamp.ToLocalTime():HH:mm}</div>";
 
         if (type == "image")
-            return $"{header}<div><img src='{fileUrl}' style='max-width:350px; border-radius:12px; margin: 5px 0; border: 1px solid #444;' /></div>{time}";
+            return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div><img src='{fileUrl}' style='max-width:350px; border-radius:12px; margin: 5px 0; border: 1px solid #444;' /></div>{time}</div>";
 
         if (type == "video")
-            return $"{header}<div><video src='{fileUrl}' controls style='max-width:350px; border-radius:12px; margin: 5px 0;' /></div>{time}";
+            return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div><video src='{fileUrl}' controls style='max-width:350px; border-radius:12px; margin: 5px 0;' /></div>{time}</div>";
 
         // 일반 파일인 경우 다운로드 링크 제공
         if (type == "file")
-            return $"{header}<div><a href='{fileUrl}' target='_blank' class='btn btn-sm btn-outline-info'>📎 파일 다운로드</a></div>{time}";
+            return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div><a href='{fileUrl}' target='_blank' class='btn btn-sm btn-outline-info'>📎 파일 다운로드</a></div>{time}</div>";
 
-        return $"{header}<div class='mt-1'>{message}</div>{time}";
+        return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div class='mt-1'>{message}</div>{time}</div>";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -510,6 +528,7 @@
                                      contentType.Contains("video") ? "video" : "file";
                 await hubConnection.SendAsync("SendMessageWithFile",
                     selectedChannel.ChannelId.ToString(),
+                    currentProfileUrl,
                     uploadedFileDto.FileUrl,
                     messageType);
             }
@@ -526,6 +545,35 @@
         }
     }
 
+    // 프로필 영역 클릭 시 파일 선택창 띄우기
+    private async Task TriggerProfileUpload()
+    {
+        await JSRuntime.InvokeVoidAsync("clickElement", "profileInput");
+    }
+
+    // 프로필 이미지 업로드 처리
+    private async Task HandleProfileImageUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            // 1. 기존 FileService를 이용해 서버에 파일 저장
+            var uploadedFile = await fileService.UploadFileAsync(file);
+
+            // 2. 서버의 유저 정보 업데이트 API 호출
+            await userService.UpdateProfileImageAsync(uploadedFile.FileUrl);
+            currentProfileUrl = uploadedFile.FileUrl;
+
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "성공", "프로필 이미지가 변경되었습니다.", "success");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"프로필 업로드 에러: {ex.Message}");
+        }
+    }
 
     // IAsyncDisposable 구현 부분 수정
     public async ValueTask DisposeAsync()

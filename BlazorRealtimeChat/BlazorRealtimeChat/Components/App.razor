@@ -91,6 +91,13 @@
             }
         };
 
+        window.clickElement = (id) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.click();
+            }
+        };
+
         async function uploadFileFromJS(dotNetHelper, file) {
             // 파일을 바이트 배열로 변환하여 C#으로 전달
             const arrayBuffer = await file.arrayBuffer();

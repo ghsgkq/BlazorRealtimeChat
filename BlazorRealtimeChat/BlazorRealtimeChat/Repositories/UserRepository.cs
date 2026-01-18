@@ -19,4 +19,25 @@ public class UserRepository(RealTimeChatContext context) : IUserRepository
         await context.SaveChangesAsync();
         return user;
     }
+
+    public async Task<User?> GetUserByIdAsync(Guid userId)
+    {
+        return await context.Users.FindAsync(userId);
+    }
+
+    public async Task UpdateProfileImgeAsync(Guid userId, string profileImageUrl)
+    {
+        var user = await context.Users.FindAsync(userId);
+        if (user != null)
+        {
+            Console.WriteLine($"사용자 찾음: {user.UserName}");
+            user.ProfileImageUrl = profileImageUrl;
+            var result = await context.SaveChangesAsync();
+            Console.WriteLine($"변경 사항 저장 완료: {result}개 행 영향 받음");
+        }
+        else
+        {
+            Console.WriteLine($"사용자를 찾을 수 없음. ID: {userId}");
+        }
+    }
 }
