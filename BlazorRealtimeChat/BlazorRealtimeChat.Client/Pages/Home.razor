@@ -166,7 +166,9 @@
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
-        currentUsername = authState.User.FindFirst("name")?.Value ?? "Anonymous";
+        var userInfo = await userService.GetUserByUserIdAsync();
+        currentUsername = userInfo?.UserName ?? "Anonymous";
+        currentProfileUrl = userInfo?.ProfileImageUrl;
 
         // 1. 초기화 태스크를 변수에 저장합니다. (await 하지 않고 바로 다음으로 넘어감)
         _signalRInitTask = InitializeSignalR();

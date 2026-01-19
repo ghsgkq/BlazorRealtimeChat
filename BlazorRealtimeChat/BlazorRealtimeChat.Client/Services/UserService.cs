@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using BlazorRealtimeChat.Shared.DTOs;
+using System.Net.Http.Json;
 
 namespace BlazorRealtimeChat.Client.Services
 {
@@ -23,6 +24,11 @@ namespace BlazorRealtimeChat.Client.Services
                 var errorContent = await response.Content.ReadAsStringAsync();
                 return (false, errorContent);
             }
+        }
+
+        public async Task<UserDto?> GetUserByUserIdAsync()
+        {
+            return await _httpClient.GetFromJsonAsync<UserDto>("api/user/me");
         }
     }
 }

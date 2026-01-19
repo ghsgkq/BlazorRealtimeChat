@@ -65,4 +65,20 @@ public class UserService(IUserRepository userRepository) : IUserService
         await userRepository.UpdateProfileImgeAsync(userId, imageUrl);
         return (true, "");
     }
+
+    public async Task<UserDto?> GetUserByUserIdAsncy(Guid userId)
+    {
+        var user = await userRepository.GetUserByIdAsync(userId);
+        if (user == null)
+        {
+            return null;
+        }
+
+        return new UserDto
+        {
+            UserId = user.UserId,
+            UserName = user.UserName,
+            ProfileImageUrl = user.ProfileImageUrl
+        };
+    }
 }

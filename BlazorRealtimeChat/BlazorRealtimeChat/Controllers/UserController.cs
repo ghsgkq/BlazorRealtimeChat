@@ -67,4 +67,18 @@ public class UserController(IUserService userService, ITokenService tokenService
         return result.Success ? Ok(new {Message = "프로필 업데이트 성공"}) : BadRequest("프로필 업데이트 실패");
     }
 
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        // 토큰에서 현재 사용자 uid 를 가져온다.
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+        var user = await userService.GetUserByUserIdAsncy(Guid.Parse(userId));
+
+        if (user == null) return NotFound();
+
+        return Ok(user);
+    }
 }
