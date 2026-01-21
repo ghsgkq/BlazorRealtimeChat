@@ -198,3 +198,11 @@
     background-color: #4752c4;
     color: white;
 }
+
+.channel-item.selected {
+    background-color: var(--bs-secondary); /* Bootstrap의 secondary 색상을 사용 */
+}
+
+.channel-item:hover {
+    background-color: var(--bs-gray-700);
+}

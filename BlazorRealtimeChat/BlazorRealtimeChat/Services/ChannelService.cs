@@ -25,7 +25,8 @@ public class ChannelService(IChannelRepository channelRepository) : IChannelServ
         var newChannel = new Data.Entity.Channel
         {
             ChannelName = createChannelDto.ChannelName,
-            ServerId = createChannelDto.ServerId
+            ServerId = createChannelDto.ServerId,
+            Type = createChannelDto.Type
         };
 
         var createdChannel = await channelRepository.AddChannelAsync(newChannel);
