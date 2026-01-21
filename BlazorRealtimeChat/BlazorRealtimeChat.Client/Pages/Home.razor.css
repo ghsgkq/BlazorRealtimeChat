@@ -206,3 +206,31 @@
 .channel-item:hover {
     background-color: var(--bs-gray-700);
 }
+
+::deep .channel-item {
+    cursor: pointer;
+    color: #949ba4;
+    transition: background-color 0.1s, color 0.1s;
+    margin-bottom: 2px;
+}
+
+    ::deep .channel-item:hover {
+        background-color: #35373c;
+        color: #dbdee1;
+    }
+
+    ::deep .channel-item.selected {
+        background-color: #3f4147 !important;
+        color: #ffffff !important;
+    }
+
+        ::deep .channel-item.selected i {
+            color: #ffffff !important;
+            opacity: 1 !important;
+        }
+
+/* 음성 하단 패널 */
+.voice-connection-panel {
+    background-color: #232428;
+    z-index: 10;
+}

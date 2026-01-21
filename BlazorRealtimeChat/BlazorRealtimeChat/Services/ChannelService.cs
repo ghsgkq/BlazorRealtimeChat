@@ -16,7 +16,8 @@ public class ChannelService(IChannelRepository channelRepository) : IChannelServ
         return channels.Select(channel => new ChannelDto
         {
             ChannelId = channel.ChannelId,
-            ChannelName = channel.ChannelName
+            ChannelName = channel.ChannelName,
+            Type = channel.Type
         });
     }
     

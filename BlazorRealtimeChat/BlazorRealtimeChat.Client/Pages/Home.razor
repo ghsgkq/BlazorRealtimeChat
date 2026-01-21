@@ -119,26 +119,28 @@
                 {
                     @foreach (var channel in channels)
                     {
-                        @* 텍스트 혹은 음성 중 하나라도 선택되어 있다면 selected 클래스를 줍니다 *@
-                        var isSelected = (channel.Type == Shared.Enums.ChannelType.Text && selectedTextChannel == channel) ||
-                        (channel.Type == Shared.Enums.ChannelType.Voice && selectedVoiceChannel == channel);
+                        // [수정] 참조(==) 대신 ChannelId를 비교해야 정확하게 하이라이트됩니다.
+                        var isTextActive = channel.Type == Shared.Enums.ChannelType.Text && selectedTextChannel?.ChannelId == channel.ChannelId;
+                        var isVoiceActive = channel.Type == Shared.Enums.ChannelType.Voice && selectedVoiceChannel?.ChannelId == channel.ChannelId;
+                        var isActive = isTextActive || isVoiceActive;
 
-                        <li class="channel-item p-2 rounded @(isSelected ? "selected" : "")" @onclick="() => SelectChannel(channel)">
-                            <div class="d-flex align-items-center">
-                                @if (channel.Type == Shared.Enums.ChannelType.Text)
-                                {
-                                    <i class="bi bi-hash fs-5 me-2" style="color: #80848e;"></i>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-volume-up-fill fs-5 me-2" style="color: #80848e;"></i>
-                                }
-                                <span class="channel-name">@channel.ChannelName</span>
+                        <li class="channel-item p-2 rounded @(isActive ? "selected" : "")" @onclick="() => SelectChannel(channel)">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    @if (channel.Type == Shared.Enums.ChannelType.Text)
+                                    {
+                                        <i class="bi bi-hash me-2 fs-5 opacity-75"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-volume-up-fill me-2 fs-5 opacity-75"></i>
+                                    }
+                                    <span class="channel-name">@channel.ChannelName</span>
+                                </div>
 
-                                @* 음성 채널에 접속 중이라면 작은 '접속됨' 표시 (옵션) *@
-                                @if (channel.Type == Shared.Enums.ChannelType.Voice && selectedVoiceChannel == channel)
+                                @if (channel.Type == Shared.Enums.ChannelType.Voice && selectedVoiceChannel?.ChannelId == channel.ChannelId)
                                 {
-                                    <span class="ms-auto badge rounded-pill bg-success" style="font-size: 0.6rem;">Connected</span>
+                                    <span class="badge rounded-pill bg-success" style="font-size: 0.6rem;">Connected</span>
                                 }
                             </div>
                         </li>
@@ -149,6 +151,24 @@
                     <li class="p-2 text-muted">채널이 없습니다.</li>
                 }
             </ul>
+        }
+        @* 음성 채널에 접속 중일 때만 나타나는 디스코드 스타일 하단바 *@
+        @if (selectedVoiceChannel != null)
+        {
+            <div class="voice-connection-panel p-2 bg-dark border-top border-secondary">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="text-success small fw-bold"><i class="bi bi-broadcast me-1"></i> 음성 연결됨</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">@selectedVoiceChannel.ChannelName</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-light border-0"><i class="bi bi-mic-fill"></i></button>
+                        <button class="btn btn-sm btn-outline-danger border-0" @onclick="LeaveVoiceChannel">
+                            <i class="bi bi-telephone-x-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
         }
         <label for="profileInput" class="user-profile mt-auto p-3 d-flex align-items-center" style="cursor: pointer; width: 100%;">
             @if (!string.IsNullOrEmpty(currentProfileUrl))
@@ -431,16 +451,26 @@
 
     private async Task JoinVoiceChannel(ChannelDto channel)
     {
-        // 이미 같은 채널에 있다면 무시
+        // 이미 이 음성 채널에 접속 중이면 무시
         if (selectedVoiceChannel?.ChannelId == channel.ChannelId) return;
 
-        // 다른 음성 채널에 있었다면 기존 연결 끊기 로직이 필요합니다.
+        // TODO: 만약 다른 음성 채널에 있었다면 기존 WebRTC 연결을 끊는 로직이 여기 들어갑니다.
+
         selectedVoiceChannel = channel;
 
-        // UI 알림
-        await JSRuntime.InvokeVoidAsync("Swal.fire", "음성 연결", $"{channel.ChannelName} 채널에 접속했습니다.", "success");
+        // UI 알림 (우측 상단 토스트 메시지 스타일)
+        await JSRuntime.InvokeVoidAsync("Swal.fire", new
+        {
+            title = "음성 채널 접속",
+            text = $"'{channel.ChannelName}' 채널에 연결되었습니다.",
+            icon = "success",
+            toast = true,
+            position = "top-end",
+            timer = 2000,
+            showConfirmButton = false
+        });
 
-        // [Next Step] 여기서 SignalR을 통해 "나 음성 접속했어"라고 알리고 WebRTC signaling 시작
+        StateHasChanged();
     }
 
 
@@ -678,13 +708,11 @@
     }
 
 
-    private async Task LeaveVoiceChannel()
+    private void LeaveVoiceChannel()
     {
-        if (selectedVoiceChannel == null) return;
-        // [Next Step] SignalR로 음성 채널 나감 알림 및 WebRTC 연결 종료 로직 추가 예정
-        var leftChannelName = selectedVoiceChannel.ChannelName;
         selectedVoiceChannel = null;
-        await JSRuntime.InvokeVoidAsync("Swal.fire", "음성 연결 종료", $"{leftChannelName} 채널에서 나갔습니다.", "info");
+        // TODO: WebRTC 마이크 및 연결 종료 로직 추가
+        StateHasChanged();
     }
 
     // IAsyncDisposable 구현 부분 수정
