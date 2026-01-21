@@ -56,14 +56,57 @@
             <ul class="list-unstyled p-2">
                 @if (showAddChannelInput)
                 {
-                    <li class="p-2">
+                    <li class="p-3 mb-3 create-channel-box rounded">
                         <EditForm Model="newChannel" OnValidSubmit="HandleCreateChannel">
                             <DataAnnotationsValidator />
-                            <div class="input-group">
-                                <InputText @bind-Value="newChannel.ChannelName" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="새 채널 이름" />
-                                <button type="submit" class="btn btn-sm btn-success">✓</button>
+
+                            <div class="mb-3">
+                                <label class="create-label text-uppercase mb-2">채널 유형</label>
+
+                                <div class="channel-type-card @(newChannel.Type == Shared.Enums.ChannelType.Text ? "active" : "")"
+                                     @onclick="() => newChannel.Type = Shared.Enums.ChannelType.Text">
+                                    <div class="d-flex align-items-center w-100">
+                                        <i class="bi bi-hash fs-3 me-3"></i>
+                                        <div class="flex-grow-1">
+                                            <div class="type-title">Text</div>
+                                            <div class="type-desc">메시지, 이미지, GIF를 보냅니다.</div>
+                                        </div>
+                                        <div class="type-radio">
+                                            <div class="radio-circle @(newChannel.Type == Shared.Enums.ChannelType.Text ? "checked" : "")"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="channel-type-card mt-2 @(newChannel.Type == Shared.Enums.ChannelType.Voice ? "active" : "")"
+                                     @onclick="() => newChannel.Type = Shared.Enums.ChannelType.Voice">
+                                    <div class="d-flex align-items-center w-100">
+                                        <i class="bi bi-volume-up-fill fs-3 me-3"></i>
+                                        <div class="flex-grow-1">
+                                            <div class="type-title">Voice</div>
+                                            <div class="type-desc">음성, 비디오로 함께 어울립니다.</div>
+                                        </div>
+                                        <div class="type-radio">
+                                            <div class="radio-circle @(newChannel.Type == Shared.Enums.ChannelType.Voice ? "checked" : "")"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <ValidationMessage For="@(() => newChannel.ChannelName)" />
+
+                            <div class="mb-3">
+                                <label class="create-label text-uppercase mb-1">채널 이름</label>
+                                <div class="input-container">
+                                    <span class="input-prefix">#</span>
+                                    <InputText @bind-Value="newChannel.ChannelName"
+                                               class="discord-input"
+                                               placeholder="새-채널" />
+                                </div>
+                                <ValidationMessage For="@(() => newChannel.ChannelName)" class="text-danger small mt-1" />
+                            </div>
+
+                            <div class="d-flex justify-content-end gap-2 mt-4">
+                                <button type="button" class="btn btn-sm btn-link text-white text-decoration-none" @onclick="ToggleAddChannelInput">취소</button>
+                                <button type="submit" class="btn btn-sm btn-discord">채널 만들기</button>
+                            </div>
                         </EditForm>
                     </li>
                 }
@@ -76,8 +119,19 @@
                 {
                     @foreach (var channel in channels)
                     {
-                        <li class="channel-item p-2 rounded @(selectedChannel == channel ? "selected" : "")" @onclick="() => SelectChannel(channel)">
-                            <span># @channel.ChannelName</span>
+                        <li class="channel-item p-2 rounded @(selectedChannel == channel ? "selected" : "")"
+                            @onclick="() => SelectChannel(channel)">
+                            <span class="d-flex align-items-center">
+                                @if (channel.Type == Shared.Enums.ChannelType.Text)
+                                {
+                                    <i class="bi bi-hash me-2"></i> @* 텍스트 채널 아이콘 *@
+                                }
+                                else
+                                {
+                                    <i class="bi bi-volume-up-fill me-2"></i> @* 음성 채널 아이콘 *@
+                                }
+                                @channel.ChannelName
+                            </span>
                         </li>
                     }
                 }
@@ -293,6 +347,22 @@
     {
         if (channel == null) return;
 
+        if (channel.Type == Shared.Enums.ChannelType.Text)
+        {
+            // 1. 텍스트 채널 로직
+            await JoinTextChannel(channel);
+        }
+        else if (channel.Type == Shared.Enums.ChannelType.Voice)
+        {
+            // 2. 음성 채널 로직
+            await JoinVoiceChannel(channel);
+        }
+        
+
+    }
+
+    private async Task JoinTextChannel(ChannelDto channel)
+    {
         // 1. hubConnection이 생성되었고 연결된 상태인지 먼저 확인합니다.
         if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
         {
@@ -318,7 +388,7 @@
                         msg.FileUrl,
                         msg.Timestamp,
                         msg.Content);
-                    chatMessages.Add(formattedMessage);                  
+                    chatMessages.Add(formattedMessage);
                 }
 
                 // 3. 서버의 JoinChannel 메서드를 호출합니다.
@@ -342,8 +412,16 @@
         StateHasChanged();
         // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
         await ScrollToBottomChatMessagesBox();
-
     }
+
+    private async Task JoinVoiceChannel(ChannelDto channel)
+    {
+        selectedChannel = channel;
+        // TODO: 여기서 브라우저 마이크 권한을 요청하고 SignalR을 통해 "나 음성방 들어옴" 알림
+        await JSRuntime.InvokeVoidAsync("Swal.fire", "음성 채널", $"{channel.ChannelName} 연결 시도 중...", "info");
+    }
+
+
 
     private async Task HandleCreateServer()
     {

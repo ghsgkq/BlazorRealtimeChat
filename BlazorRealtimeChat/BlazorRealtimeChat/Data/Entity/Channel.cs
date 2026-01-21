@@ -1,3 +1,4 @@
+using BlazorRealtimeChat.Shared.Enums;
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -23,4 +24,9 @@ public class Channel
 
     // 관계 설정: 하나의 채널에는 여러 개의 메시지가 있습니다. (@OneToMany)
     public virtual ICollection<Message> Messages { get; set; }
+
+    // 채널 유형 (예: 텍스트, 음성 등)
+    [Required]
+    public ChannelType Type { get; set; } = ChannelType.Text;
+
 }

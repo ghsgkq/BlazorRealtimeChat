@@ -92,3 +92,109 @@
     border: 2px dashed #5865f2 !important;
     background-color: rgba(88, 101, 243, 0.1) !important;
 }
+
+/* 채널 생성 박스 */
+.create-channel-box {
+    background-color: #313338;
+    border: 1px solid #1e1f22;
+}
+
+.create-label {
+    color: #b5bac1;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* 채널 타입 선택 카드 */
+.channel-type-card {
+    background-color: #2b2d31;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 0.1s;
+    color: #dbdee1;
+}
+
+    .channel-type-card:hover {
+        background-color: #35373c;
+    }
+
+    .channel-type-card.active {
+        background-color: #3f4147;
+        color: #ffffff;
+    }
+
+.type-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.type-desc {
+    font-size: 0.75rem;
+    color: #b5bac1;
+}
+
+/* 라디오 버튼 커스텀 */
+.radio-circle {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #b5bac1;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .radio-circle.checked {
+        border-color: #ffffff;
+    }
+
+        .radio-circle.checked::after {
+            content: "";
+            width: 10px;
+            height: 10px;
+            background-color: #ffffff;
+            border-radius: 50%;
+        }
+
+/* 디스코드 스타일 입력창 */
+.input-container {
+    display: flex;
+    align-items: center;
+    background-color: #1e1f22;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+
+.input-prefix {
+    color: #80848e;
+    font-size: 1.2rem;
+    margin-right: 4px;
+}
+
+::deep .discord-input {
+    background: transparent;
+    border: none;
+    color: #dbdee1;
+    width: 100%;
+    padding: 8px 0;
+    outline: none !important;
+}
+
+.discord-input::placeholder {
+    color: #4e5058;
+}
+
+/* 디스코드 블루 버튼 */
+.btn-discord {
+    background-color: #5865f2;
+    color: white;
+    font-weight: 500;
+    padding: 6px 20px;
+}
+
+.btn-discord:hover {
+    background-color: #4752c4;
+    color: white;
+}

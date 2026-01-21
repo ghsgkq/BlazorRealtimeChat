@@ -1,3 +1,4 @@
+using BlazorRealtimeChat.Shared.Enums;
 using System;
 using System.ComponentModel.DataAnnotations;
 
@@ -13,4 +14,6 @@ public class CreateChannelDto
     [MinLength(2, ErrorMessage = "채널 이름은 최소 2자 이상이어야 합니다.")]
     public string ChannelName { get; set; }
 
+    [Required]
+    public ChannelType Type { get; set; } = ChannelType.Text;
 }
