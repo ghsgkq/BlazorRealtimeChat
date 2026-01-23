@@ -82,5 +82,36 @@ namespace BlazorRealtimeChat.Hubs
                 throw; // 에러를 다시 던져서 필요시 서버 로그 시스템에 기록되게 합니다.
             }
         }
+
+        //-- WebRTC 관련 메서드 --//
+        
+        // 특정 대상에게 WebRTC 신호를 보내는 메서드
+    
+        public async Task SendSignal(string targetConnectionId, string signal)
+        {
+            // 보낸 사람의 ID를 포함하여 대상에게 전달
+            await Clients.Client(targetConnectionId).SendAsync("ReceiveSignal", Context.ConnectionId, signal);
+        }
+
+        // 2. 음성 채널 그룹에 입장하고 다른 사람들에게 알립니다.
+        public async Task JoinVoiceGroup(string channelId)
+        {
+            string groupName = $"voice-{channelId}";
+            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+
+            // 이 방에 있는 다른 사람들에게 "나 들어왔어, 연결하자!"라고 알림
+            await Clients.OthersInGroup(groupName).SendAsync("UserJoinedVoice", Context.ConnectionId);
+        }
+
+        // 3. 음성 채널 퇴장 알림
+        public async Task LeaveVoiceGroup(string channelId)
+        {
+            string groupName = $"voice-{channelId}";
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+            await Clients.OthersInGroup(groupName).SendAsync("UserLeftVoice", Context.ConnectionId);
+        }
+
+
+        //-- WebRTC 관련 메서드 --//
     }
 }

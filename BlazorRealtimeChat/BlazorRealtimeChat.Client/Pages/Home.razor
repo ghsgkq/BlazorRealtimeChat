@@ -299,6 +299,18 @@
 
         });
 
+        // 상대방이 보낸 신호(Offer/Answer/ICE)를 받았을 때 JS로 전달
+        hubConnection.On<string, string>("ReceiveSignal", async (senderId, signal) =>
+        {
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.handleSignal", senderId, signal);
+        });
+
+        // 새로운 유저가 음성 채널에 들어왔을 때, JS에서 연결을 시작(Offer 생성)하도록 함
+        hubConnection.On<string>("UserJoinedVoice", async (senderId) =>
+        {
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.initializeConnection", senderId);
+        });
+
         try
         {
             // 2. 서버와 연결 시작
@@ -318,6 +330,17 @@
         catch (Exception ex)
         {
             Console.WriteLine($"SignalR 연결 실패: {ex.Message}");
+        }
+    }
+
+    // 자바스크립트에서 호출할 시그널 전송 메서드
+    [JSInvokable("SendSignalToHex")]
+    public async Task SendSignalToHex(string targetId, string signal)
+    {
+        if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
+        {
+            // 서버의 ChatHub.SendSignal 메서드 호출
+            await hubConnection.SendAsync("SendSignal", targetId, signal);
         }
     }
 
@@ -451,24 +474,19 @@
 
     private async Task JoinVoiceChannel(ChannelDto channel)
     {
-        // 이미 이 음성 채널에 접속 중이면 무시
         if (selectedVoiceChannel?.ChannelId == channel.ChannelId) return;
 
-        // TODO: 만약 다른 음성 채널에 있었다면 기존 WebRTC 연결을 끊는 로직이 여기 들어갑니다.
+        // 1. JS를 통해 마이크 권한 획득 및 로컬 스트림 시작
+        var hasMic = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startLocalStream", _objRef);
+        if (!hasMic) return;
 
         selectedVoiceChannel = channel;
 
-        // UI 알림 (우측 상단 토스트 메시지 스타일)
-        await JSRuntime.InvokeVoidAsync("Swal.fire", new
+        // 2. 서버에 "음성 채널 입장" 알림 (매우 중요!)
+        if (hubConnection != null)
         {
-            title = "음성 채널 접속",
-            text = $"'{channel.ChannelName}' 채널에 연결되었습니다.",
-            icon = "success",
-            toast = true,
-            position = "top-end",
-            timer = 2000,
-            showConfirmButton = false
-        });
+            await hubConnection.SendAsync("JoinVoiceGroup", channel.ChannelId.ToString());
+        }
 
         StateHasChanged();
     }
@@ -708,10 +726,14 @@
     }
 
 
-    private void LeaveVoiceChannel()
+    private async void LeaveVoiceChannel()
     {
-        selectedVoiceChannel = null;
-        // TODO: WebRTC 마이크 및 연결 종료 로직 추가
+        if (selectedVoiceChannel != null)
+        {
+            await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
+            selectedVoiceChannel = null;
+        }
         StateHasChanged();
     }
 
