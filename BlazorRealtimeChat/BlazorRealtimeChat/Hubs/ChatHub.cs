@@ -1,7 +1,9 @@
 using BlazorRealtimeChat.Data.Entity;
 using BlazorRealtimeChat.Repositories;
+using BlazorRealtimeChat.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 
 namespace BlazorRealtimeChat.Hubs
@@ -9,6 +11,9 @@ namespace BlazorRealtimeChat.Hubs
     [Authorize] // 인증된 사용자만 허브에 연결할 수 있도록 합니다.
     public class ChatHub(IMessageRepository messageRepository) : Hub
     {
+        // {채널ID, 유저리스트} 형태의 정적 저장소
+        private static readonly ConcurrentDictionary<string, List<VoiceUserDto>> VoiceUsers = new();
+
         // 클라이언트가 채널에 참여하기 위해 호출하는 메소드
         public async Task JoinChannel(string channelId)
         {
@@ -93,22 +98,101 @@ namespace BlazorRealtimeChat.Hubs
             await Clients.Client(targetConnectionId).SendAsync("ReceiveSignal", Context.ConnectionId, signal);
         }
 
-        // 2. 음성 채널 그룹에 입장하고 다른 사람들에게 알립니다.
-        public async Task JoinVoiceGroup(string channelId)
+        // 음성 채널 그룹에 입장하고 다른 사람들에게 알립니다.
+        public async Task JoinVoiceGroup(string channelId, string userName, string profileUrl)
         {
+            // 입장 전 다른 방(혹은 같은 방의 이전 세션)에 남아있던 내 정보 제거 (중복 방지)
+            await CleanupUserFromAllGroups();
+
             string groupName = $"voice-{channelId}";
             await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-            // 이 방에 있는 다른 사람들에게 "나 들어왔어, 연결하자!"라고 알림
+            var user = new VoiceUserDto
+            {
+                ConnectionId = Context.ConnectionId,
+                UserName = userName,
+                ProfileImageUrl = profileUrl
+            };
+
+            var users = VoiceUsers.GetOrAdd(channelId, _ => new List<VoiceUserDto>());
+            lock (users) { users.Add(user); }
+
+            // 방 전체에 업데이트 알림
+            await BroadcastVoiceUpdate(channelId);
             await Clients.OthersInGroup(groupName).SendAsync("UserJoinedVoice", Context.ConnectionId);
         }
 
-        // 3. 음성 채널 퇴장 알림
+        // 음성 채널 퇴장 알림
         public async Task LeaveVoiceGroup(string channelId)
+        {
+            await RemoveUserFromGroup(channelId);
+        }
+
+        // 모든 채널에서 현재 연결(ConnectionId)을 찾아 제거하는 헬퍼 메서드
+        private async Task LeaveAllVoiceGroups()
+        {
+            foreach (var channelId in VoiceUsers.Keys)
+            {
+                if (VoiceUsers.TryGetValue(channelId, out var users))
+                {
+                    bool removed;
+                    lock (users) { removed = users.RemoveAll(u => u.ConnectionId == Context.ConnectionId) > 0; }
+
+                    if (removed)
+                    {
+                        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{channelId}");
+                        await BroadcastVoiceUpdate(channelId);
+                    }
+                }
+            }
+        }
+
+        private async Task RemoveUserFromGroup(string channelId)
         {
             string groupName = $"voice-{channelId}";
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
-            await Clients.OthersInGroup(groupName).SendAsync("UserLeftVoice", Context.ConnectionId);
+
+            if (VoiceUsers.TryGetValue(channelId, out var users))
+            {
+                lock (users) { users.RemoveAll(u => u.ConnectionId == Context.ConnectionId); }
+                await BroadcastVoiceUpdate(channelId);
+            }
+        }
+
+        private async Task CleanupUserFromAllGroups()
+        {
+            foreach (var channelId in VoiceUsers.Keys)
+            {
+                if (VoiceUsers.TryGetValue(channelId, out var users))
+                {
+                    bool removed;
+                    lock (users) { removed = users.RemoveAll(u => u.ConnectionId == Context.ConnectionId) > 0; }
+                    if (removed)
+                    {
+                        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{channelId}");
+                        await BroadcastVoiceUpdate(channelId);
+                    }
+                }
+            }
+        }
+
+        // 연결이 끊어지면 실행 (새로고침, 브라우저 닫기 대응)
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            await CleanupUserFromAllGroups();
+            await base.OnDisconnectedAsync(exception);
+        }
+
+        private async Task BroadcastVoiceUpdate(string channelId)
+        {
+            if (VoiceUsers.TryGetValue(channelId, out var users))
+            {
+                // 해당 채널 그룹에 있는 모든 사람에게 최신 명단 전송
+                await Clients.Group($"voice-{channelId}").SendAsync("UpdateVoiceUsers", channelId, users);
+
+                // 만약 서버를 옮겼거나 하는 경우를 대비해 전체 사용자에게 브로드캐스트 (디코 스타일 사이드바 동기화)
+                await Clients.All.SendAsync("UpdateVoiceUsers", channelId, users);
+            }
         }
 
 

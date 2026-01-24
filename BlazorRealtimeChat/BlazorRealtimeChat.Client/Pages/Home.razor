@@ -117,34 +117,59 @@
                 }
                 else if (channels != null && channels.Any())
                 {
-                    @foreach (var channel in channels)
-                    {
-                        // [수정] 참조(==) 대신 ChannelId를 비교해야 정확하게 하이라이트됩니다.
-                        var isTextActive = channel.Type == Shared.Enums.ChannelType.Text && selectedTextChannel?.ChannelId == channel.ChannelId;
-                        var isVoiceActive = channel.Type == Shared.Enums.ChannelType.Voice && selectedVoiceChannel?.ChannelId == channel.ChannelId;
-                        var isActive = isTextActive || isVoiceActive;
+                    @* 텍스트 채널 그룹 *@
+                    <div class="channel-group-header px-3 mt-3 d-flex justify-content-between align-items-center">
+                        <span class="small text-uppercase fw-bold text-secondary" style="font-size: 0.7rem;">텍스트 채널</span>
+                        <button class="btn btn-sm text-secondary p-0" @onclick="ToggleAddChannelInput"><i class="bi bi-plus-lg"></i></button>
+                    </div>
+                    <ul class="list-unstyled p-2">
+                        @foreach (var channel in channels.Where(c => c.Type == Shared.Enums.ChannelType.Text))
+                        {
+                            <li class="channel-item p-2 rounded @(selectedTextChannel?.ChannelId == channel.ChannelId ? "selected" : "")"
+                                @onclick="() => SelectChannel(channel)">
+                                <i class="bi bi-hash me-2 opacity-50"></i><span>@channel.ChannelName</span>
+                            </li>
+                        }
+                    </ul>
 
-                        <li class="channel-item p-2 rounded @(isActive ? "selected" : "")" @onclick="() => SelectChannel(channel)">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center">
-                                    @if (channel.Type == Shared.Enums.ChannelType.Text)
+                    @* 음성 채널 그룹 *@
+                    <div class="channel-group-header px-3 mt-3">
+                        <span class="small text-uppercase fw-bold text-secondary" style="font-size: 0.7rem;">음성 채널</span>
+                    </div>
+                    <ul class="list-unstyled p-2">
+                        @foreach (var channel in channels.Where(c => c.Type == Shared.Enums.ChannelType.Voice))
+                        {
+                            <li class="channel-item p-2 rounded @(selectedVoiceChannel?.ChannelId == channel.ChannelId ? "selected" : "")"
+                                @onclick="() => SelectChannel(channel)">
+                                <i class="bi bi-volume-up-fill me-2 opacity-50"></i><span>@channel.ChannelName</span>
+                            </li>
+
+                            @* 해당 채널에 유저가 있을 때만 목록 표시 *@
+                            @if (voiceRoomUsers.TryGetValue(channel.ChannelId.ToString(), out var users) && users.Any())
+                            {
+                                <div class="ms-4 mb-2">
+                                    @foreach (var user in users)
                                     {
-                                        <i class="bi bi-hash me-2 fs-5 opacity-75"></i>
+                                        <div class="d-flex align-items-center mb-1 py-1 user-voice-item">
+                                            @* 프로필 이미지 또는 첫 글자 *@
+                                            @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                                            {
+                                                <img src="@user.ProfileImageUrl" class="rounded-circle me-2" style="width: 20px; height: 20px; object-fit: cover;" />
+                                            }
+                                            else
+                                            {
+                                                <div class="bg-secondary rounded-circle me-2 d-flex align-items-center justify-content-center text-white"
+                                                     style="width: 20px; height: 20px; font-size: 0.6rem;">
+                                                    @user.UserName[0]
+                                                </div>
+                                            }
+                                            <span class="small text-secondary">@user.UserName</span>
+                                        </div>
                                     }
-                                    else
-                                    {
-                                        <i class="bi bi-volume-up-fill me-2 fs-5 opacity-75"></i>
-                                    }
-                                    <span class="channel-name">@channel.ChannelName</span>
                                 </div>
-
-                                @if (channel.Type == Shared.Enums.ChannelType.Voice && selectedVoiceChannel?.ChannelId == channel.ChannelId)
-                                {
-                                    <span class="badge rounded-pill bg-success" style="font-size: 0.6rem;">Connected</span>
-                                }
-                            </div>
-                        </li>
-                    }
+                            }
+                        }
+                    </ul>
                 }
                 else
                 {
@@ -251,6 +276,8 @@
 
     private string? currentProfileUrl; // 현재 사용자의 프로필 URL
 
+    private Dictionary<string, List<VoiceUserDto>> voiceRoomUsers = new();
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
@@ -309,6 +336,12 @@
         hubConnection.On<string>("UserJoinedVoice", async (senderId) =>
         {
             await JSRuntime.InvokeVoidAsync("webrtcFunctions.initializeConnection", senderId);
+        });
+
+        hubConnection.On<string, List<VoiceUserDto>>("UpdateVoiceUsers", (channelId, users) =>
+        {
+            voiceRoomUsers[channelId] = users;
+            StateHasChanged();
         });
 
         try
@@ -476,18 +509,26 @@
     {
         if (selectedVoiceChannel?.ChannelId == channel.ChannelId) return;
 
-        // 1. JS를 통해 마이크 권한 획득 및 로컬 스트림 시작
+        // 1. [중요] 기존에 접속한 음성 채널이 있었다면 서버에 퇴장 알림
+        if (selectedVoiceChannel != null && hubConnection != null)
+        {
+            await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
+        }
+
+        // 2. 마이크 권한 요청 및 스트림 시작
         var hasMic = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startLocalStream", _objRef);
         if (!hasMic) return;
 
         selectedVoiceChannel = channel;
 
-        // 2. 서버에 "음성 채널 입장" 알림 (매우 중요!)
+        // 3. 서버에 입장 알림
         if (hubConnection != null)
         {
-            await hubConnection.SendAsync("JoinVoiceGroup", channel.ChannelId.ToString());
+            await hubConnection.SendAsync("JoinVoiceGroup",
+                channel.ChannelId.ToString(),
+                currentUsername,
+                currentProfileUrl ?? "");
         }
-
         StateHasChanged();
     }
 
@@ -728,7 +769,7 @@
 
     private async void LeaveVoiceChannel()
     {
-        if (selectedVoiceChannel != null)
+        if (selectedVoiceChannel != null && hubConnection != null)
         {
             await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
             await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
@@ -740,7 +781,14 @@
     // IAsyncDisposable 구현 부분 수정
     public async ValueTask DisposeAsync()
     {
-        _objRef?.Dispose(); // [중요] 생성한 참조를 반드시 해제합니다.
+        // 앱 종료 시 음성 채널 퇴장 요청
+        if (selectedVoiceChannel != null && hubConnection != null)
+        {
+            await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
+        }
+
+        _objRef?.Dispose();
         if (hubConnection is not null) await hubConnection.DisposeAsync();
     }
 }
