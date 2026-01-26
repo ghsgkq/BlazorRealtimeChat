@@ -61,14 +61,22 @@ window.webrtcFunctions = {
     },
 
     stopStream: () => {
+        console.log("🛑 WebRTC 모든 연결 및 트랙 종료");
+        // 모든 피어 연결 닫기
+        Object.keys(peerConnections).forEach(id => {
+            if (peerConnections[id]) {
+                peerConnections[id].close();
+                delete peerConnections[id];
+            }
+        });
+
+        // 로컬 마이크 트랙 정지
         if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
         }
-        Object.keys(peerConnections).forEach(id => {
-            peerConnections[id].close();
-            delete peerConnections[id];
-            delete iceCandidatesQueue[id];
-        });
+        // ICE 후보 큐 비우기
+        Object.keys(iceCandidatesQueue).forEach(id => delete iceCandidatesQueue[id]);
     }
 };
 

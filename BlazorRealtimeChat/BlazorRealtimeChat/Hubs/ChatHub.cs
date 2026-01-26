@@ -3,6 +3,7 @@ using BlazorRealtimeChat.Repositories;
 using BlazorRealtimeChat.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.FileProviders;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 
@@ -193,6 +194,12 @@ namespace BlazorRealtimeChat.Hubs
                 // 만약 서버를 옮겼거나 하는 경우를 대비해 전체 사용자에게 브로드캐스트 (디코 스타일 사이드바 동기화)
                 await Clients.All.SendAsync("UpdateVoiceUsers", channelId, users);
             }
+        }
+
+        public async Task<IDictionary<string, List<VoiceUserDto>>> GetVoiceUsersState()
+        {
+            // 현재 메모리에 저장된 모든 음성 채널의 유저 정보를 반환합니다.
+            return VoiceUsers;
         }
 
 

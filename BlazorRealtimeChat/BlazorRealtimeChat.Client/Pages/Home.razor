@@ -410,7 +410,17 @@
 
             channels = await ChannelService.GetChannelsAsync(server.ServerId);
 
-            // 2. 데이터 확인 로그
+            // 서버 선택 시 현재 모든 채널의 음성 접속자 정보를 가져옵니다.
+            if (hubConnection?.State == HubConnectionState.Connected)
+            {
+                var voiceState = await hubConnection.InvokeAsync<Dictionary<string, List<VoiceUserDto>>>("GetVoiceUsersState");
+                if (voiceState != null)
+                {
+                    voiceRoomUsers = voiceState;
+                }
+            }
+
+            // 데이터 확인 로그
             Console.WriteLine($"가져온 채널 개수: {channels?.Count ?? 0}");
         }
         catch (Exception ex)
@@ -448,7 +458,7 @@
             // 2. 음성 채널 로직
             await JoinVoiceChannel(channel);
         }
-        
+
 
     }
 
@@ -507,7 +517,15 @@
 
     private async Task JoinVoiceChannel(ChannelDto channel)
     {
+
+
         if (selectedVoiceChannel?.ChannelId == channel.ChannelId) return;
+
+        // 만약 이미 다른 음성 채널이 있다면, 리소스를 먼저 정리한다
+        if (selectedVoiceChannel != null)
+        {
+            LeaveVoiceChannel();
+        }
 
         // 1. [중요] 기존에 접속한 음성 채널이 있었다면 서버에 퇴장 알림
         if (selectedVoiceChannel != null && hubConnection != null)
