@@ -150,21 +150,58 @@
                                 <div class="ms-4 mb-2">
                                     @foreach (var user in users)
                                     {
-                                        <div class="d-flex align-items-center mb-1 py-1 user-voice-item">
-                                            @* 프로필 이미지 또는 첫 글자 *@
+                                        @* 1. 유저 아이템 (클릭 가능 영역) *@
+                                        @* 메뉴가 열린 상태면 active 클래스 추가 *@
+                                        <div class="d-flex align-items-center mb-1 py-2 px-2 rounded user-voice-item @(openMenuConnectionId == user.ConnectionId ? "active" : "")"
+                                             @onclick="() => ToggleUserMenu(user.ConnectionId)"
+                                             style="cursor: pointer;">
+
                                             @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
                                             {
-                                                <img src="@user.ProfileImageUrl" class="rounded-circle me-2" style="width: 20px; height: 20px; object-fit: cover;" />
+                                                <img src="@user.ProfileImageUrl" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;" />
                                             }
                                             else
                                             {
-                                                <div class="bg-secondary rounded-circle me-2 d-flex align-items-center justify-content-center text-white"
-                                                     style="width: 20px; height: 20px; font-size: 0.6rem;">
-                                                    @user.UserName[0]
-                                                </div>
+                                                <span class="bg-primary rounded-circle me-2 text-white fw-bold"
+                                                      style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">
+                                                    @currentUsername?.Substring(0, 1).ToUpper()
+                                                </span>
                                             }
-                                            <span class="small text-secondary">@user.UserName</span>
+
+                                            <span class="small text-light flex-grow-1 fw-bold">@user.UserName</span>
+
+                                            @* 음소거 상태 아이콘 표시 *@
+                                            @if (IsPeerMuted(user.ConnectionId))
+                                            {
+                                                <i class="bi bi-mic-mute-fill text-danger small"></i>
+                                            }
                                         </div>
+
+                                        @* 2. 클릭 시 나타나는 하단 드롭다운 패널 (디스코드 스타일) *@
+                                        @if (openMenuConnectionId == user.ConnectionId && user.ConnectionId != hubConnection?.ConnectionId)
+                                        {
+                                            <div class="voice-user-popout p-3 ms-2 mb-2 rounded">
+                                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                                    <span class="small text-uppercase fw-bold" style="font-size: 0.7rem;">사용자 볼륨</span>
+                                                    <span class="small">@((int)(GetPeerVolume(user.ConnectionId) * 100))%</span>
+                                                </div>
+
+                                                <div class="d-flex align-items-center gap-3">
+                                                    @* 볼륨 슬라이더 *@
+                                                    <input type="range" class="voice-slider flex-grow-1" min="0" max="1" step="0.01"
+                                                           value="@GetPeerVolume(user.ConnectionId)"
+                                                           @oninput="(e) => ChangePeerVolume(user.ConnectionId, e)"
+                                                           @onclick:stopPropagation /> @* 슬라이더 클릭 시 메뉴 닫힘 방지 *@
+
+                                                    @* 음소거 토글 버튼 *@
+                                                    <button class="btn btn-sm btn-outline-secondary border-0 p-1"
+                                                            @onclick="() => TogglePeerMute(user.ConnectionId)"
+                                                            @onclick:stopPropagation>
+                                                        <i class="bi @(IsPeerMuted(user.ConnectionId) ? "bi-mic-mute-fill text-danger" : "bi-mic-fill") fs-5"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        }
                                     }
                                 </div>
                             }
@@ -187,7 +224,12 @@
                         <div class="text-muted" style="font-size: 0.75rem;">@selectedVoiceChannel.ChannelName</div>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-light border-0"><i class="bi bi-mic-fill"></i></button>
+                        @* 내 마이크 끄기/켜기 *@
+                        <button class="btn btn-sm @(isLocalMicMuted ? "btn-danger" : "btn-outline-light") border-0"
+                                @onclick="ToggleLocalMic">
+                            <i class="bi @(isLocalMicMuted ? "bi-mic-mute-fill" : "bi-mic-fill")"></i>
+                        </button>
+
                         <button class="btn btn-sm btn-outline-danger border-0" @onclick="LeaveVoiceChannel">
                             <i class="bi bi-telephone-x-fill"></i>
                         </button>
@@ -226,7 +268,7 @@
             }
         </div>
 
-        <div class="chat-input p-3 bg-dark-subtle">
+        <div class="chat-input p-3 bg-dark">
             <div class="input-group">
                 @* 1. InputFile은 그대로 두되, ID를 확실히 지정합니다 *@
                 <InputFile OnChange="HandleFileSelected" id="fileInput" style="display:none;" />
@@ -277,6 +319,12 @@
     private string? currentProfileUrl; // 현재 사용자의 프로필 URL
 
     private Dictionary<string, List<VoiceUserDto>> voiceRoomUsers = new();
+
+    private Dictionary<string, double> userVolumes = new (); // ConnectionId 별 볼륨 (0.0 ~ 1.0)
+    private Dictionary<string, bool> userMutes = new(); // ConnectionId 별 음소거 상태
+    private bool isLocalMicMuted = false; // 로컬 음소거 상태
+
+    private string? openMenuConnectionId; // 현재 열려있는 유저 메뉴의 ConnectionId
 
     protected override async Task OnInitializedAsync()
     {
@@ -795,6 +843,53 @@
         }
         StateHasChanged();
     }
+
+    // 상대방 볼륨 조절
+    private async Task ChangePeerVolume(string connectionId, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var volume))
+        {
+            userVolumes[connectionId] = volume;
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.setPeerVolume", connectionId, volume);
+        }
+    }
+
+    // 상대방 음소거 토글
+    private async Task TogglePeerMute(string connectionId)
+    {
+        var isMuted = !userMutes.GetValueOrDefault(connectionId, false);
+        userMutes[connectionId] = isMuted;
+        await JSRuntime.InvokeVoidAsync("webrtcFunctions.setPeerMute", connectionId, isMuted);
+    }
+
+    // 내 마이크 토글
+    private async Task ToggleLocalMic()
+    {
+        isLocalMicMuted = !isLocalMicMuted;
+        // JS의 enabled는 true가 소리가 나오는 상태이므로 반대로 전달
+        await JSRuntime.InvokeVoidAsync("webrtcFunctions.setLocalMicEnabled", !isLocalMicMuted);
+    }
+
+    // 유저 클릭 시 메뉴 토글 메서드
+    private void ToggleUserMenu(string connectionId)
+    {
+        // 자기 자신을 클릭했거나, 이미 열린 사람을 다시 클릭하면 닫음
+        if (connectionId == hubConnection?.ConnectionId || openMenuConnectionId == connectionId)
+        {
+            openMenuConnectionId = null;
+        }
+        else
+        {
+            // 다른 사람을 클릭하면 그 사람의 메뉴를 엶
+            openMenuConnectionId = connectionId;
+        }
+        StateHasChanged(); // UI 갱신 필요
+    }
+
+    // 헬퍼 메서드들
+    private double GetPeerVolume(string id) => userVolumes.GetValueOrDefault(id, 1.0);
+    private bool IsPeerMuted(string id) => userMutes.GetValueOrDefault(id, false);
+
 
     // IAsyncDisposable 구현 부분 수정
     public async ValueTask DisposeAsync()

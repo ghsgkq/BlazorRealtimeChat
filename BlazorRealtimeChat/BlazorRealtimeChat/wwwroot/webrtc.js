@@ -4,6 +4,33 @@ const iceCandidatesQueue = {}; // [추가] PC가 생성되기 전 도착한 후�
 let dotNetHelper;
 
 window.webrtcFunctions = {
+
+    // 1. 상대방의 볼륨 조절 (0.0 ~ 1.0)
+    setPeerVolume: async (targetId, volume) => {
+        const audio = document.getElementById(`audio-${targetId}`);
+        if (audio) {
+            audio.volume = volume;
+        }
+    },
+
+    // 2. 상대방 음소거
+    setPeerMute: async (targetId, isMuted) => {
+        const audio = document.getElementById(`audio-${targetId}`);
+        if (audio) {
+            audio.muted = isMuted;
+        }
+    },
+
+    // 3. 내 마이크 켜기/끄기
+    setLocalMicEnabled: async (enabled) => {
+        if (localStream) {
+            localStream.getAudioTracks().forEach(track => {
+                track.enabled = enabled;
+            });
+        }
+        return enabled;
+    },
+
     startLocalStream: async (helper) => {
         dotNetHelper = helper;
         try {
@@ -78,6 +105,7 @@ window.webrtcFunctions = {
         // ICE 후보 큐 비우기
         Object.keys(iceCandidatesQueue).forEach(id => delete iceCandidatesQueue[id]);
     }
+
 };
 
 function createPeerConnection(targetId) {
