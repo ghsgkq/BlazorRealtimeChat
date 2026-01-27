@@ -265,3 +265,14 @@
     accent-color: #5865f2; /* 디스코드 블루 */
     border-radius: 3px;
 }
+
+/* 말하는 중일 때 적용할 클래스 */
+.speaking-ring {
+    box-shadow: 0 0 0 2px #23a559;
+    transition: box-shadow 0.1s ease-in-out; /* 부드러운 전환 */
+}
+
+/* 내 프로필 영역의 테두리는 조금 더 두껍게 */
+.user-profile .speaking-ring {
+    box-shadow: 0 0 0 3px #23a559;
+}

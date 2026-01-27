@@ -202,6 +202,13 @@ namespace BlazorRealtimeChat.Hubs
             return VoiceUsers;
         }
 
+        // 말하는 상태 변경 알림 (채널 ID는 클라이언트가 현재 접속 중인 채널을 보내줌)
+        public async Task SendSpeakingState(string channelId, bool isSpeaking)
+        {
+            // 나를 포함한 그룹 전체에게 알림 (내 UI도 업데이트되어야 하므로)
+            await Clients.Group($"voice-{channelId}").SendAsync("ReceiveSpeakingState", Context.ConnectionId, isSpeaking);
+        }
+
 
         //-- WebRTC 관련 메서드 --//
     }

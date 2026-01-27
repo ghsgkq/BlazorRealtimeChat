@@ -104,8 +104,58 @@ window.webrtcFunctions = {
         }
         // ICE 후보 큐 비우기
         Object.keys(iceCandidatesQueue).forEach(id => delete iceCandidatesQueue[id]);
-    }
+    },
 
+    // 오디오 분석 시작
+    setupAudioAnalysis: async () => {
+        if (!localStream) return;
+
+        // 오디오 컨텍스트 생성 ( 브라우저 호완성 처리 )
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContext();
+
+        // 마이크 스트림을 소스로 연결
+        microphone = audioContext.createMediaStreamSource(localStream);
+        
+        // 분석기 노드 생성
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512; // 분석 정밀도 설정
+        microphone.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const threshold = 20; // 말하는 것으로 간주할 볼륨 임계값 (조절 가능)
+
+        // 100ms마다 볼륨 체크 루프 시작
+        speakingCheckInterval = setInterval(() => {
+            analyser.getByteFrequencyData(dataArray);
+
+            // 전체 주파수 대역의 평균 볼륨 계산
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const averageVolume = sum / dataArray.length;
+
+            // 임계값과 비교하여 상태 결정
+            const isSpeakingNow = averageVolume > threshold;
+
+            // 상태가 변경되었을 때만 C#으로 알림 (불필요한 SignalR 호출 방지)
+            if (isSpeakingNow !== isCurrentlySpeaking) {
+                isCurrentlySpeaking = isSpeakingNow;
+                dotNetHelper.invokeMethodAsync('SetIsSpeakingState', isCurrentlySpeaking);
+            }
+        }, 100);
+    },
+
+    // 오디오 분석 중지
+    stopAudioAnalysis: () => {
+        if (speakingCheckInterval) clearInterval(speakingCheckInterval);
+        if (audioContext) audioContext.close();
+        isCurrentlySpeaking = false;
+        audioContext = null;
+        analyser = null;
+        microphone = null;
+    }
 };
 
 function createPeerConnection(targetId) {

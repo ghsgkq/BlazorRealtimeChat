@@ -152,17 +152,18 @@
                                     {
                                         @* 1. 유저 아이템 (클릭 가능 영역) *@
                                         @* 메뉴가 열린 상태면 active 클래스 추가 *@
+                                        @* IsSpeaking 상태가 true면 speaking-ring 클래스 추가 *@
                                         <div class="d-flex align-items-center mb-1 py-2 px-2 rounded user-voice-item @(openMenuConnectionId == user.ConnectionId ? "active" : "")"
                                              @onclick="() => ToggleUserMenu(user.ConnectionId)"
                                              style="cursor: pointer;">
 
                                             @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
                                             {
-                                                <img src="@user.ProfileImageUrl" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;" />
+                                                <img src="@user.ProfileImageUrl" class="rounded-circle me-2 @(IsSpeaking(user.ConnectionId) ? "speaking-ring" : "")" style="width: 32px; height: 32px; object-fit: cover;" />
                                             }
                                             else
                                             {
-                                                <span class="bg-primary rounded-circle me-2 text-white fw-bold"
+                                                <span class="bg-primary rounded-circle me-2 text-white fw-bold @(IsSpeaking(user.ConnectionId) ? "speaking-ring" : "")"
                                                       style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">
                                                     @currentUsername?.Substring(0, 1).ToUpper()
                                                 </span>
@@ -326,6 +327,9 @@
 
     private string? openMenuConnectionId; // 현재 열려있는 유저 메뉴의 ConnectionId
 
+    // ConnectionId별 말하는 상태 저장 (true면 말하는 중)
+    private Dictionary<string, bool> speakingStates = new();
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateTask;
@@ -390,6 +394,12 @@
         {
             voiceRoomUsers[channelId] = users;
             StateHasChanged();
+        });
+
+        hubConnection.On<string, bool>("ReceiveSpeakingState", (connectionId, isSpeaking) =>
+        {
+            speakingStates[connectionId] = isSpeaking;
+            StateHasChanged(); // UI 갱신
         });
 
         try
@@ -584,6 +594,9 @@
         // 2. 마이크 권한 요청 및 스트림 시작
         var hasMic = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startLocalStream", _objRef);
         if (!hasMic) return;
+
+        // 마이크 권한 획득 후 오디오 분석 시작!
+        await JSRuntime.InvokeVoidAsync("webrtcFunctions.setupAudioAnalysis");
 
         selectedVoiceChannel = channel;
 
@@ -802,6 +815,17 @@
         }
     }
 
+    // JS에서 호출하는 내 상태 변경 알림 메서드
+    [JSInvokable("SetIsSpeakingState")]
+    public async Task SetIsSpeakingState(bool isSpeaking)
+    {
+        if (selectedVoiceChannel != null && hubConnection?.State == HubConnectionState.Connected)
+        {
+            // 내 상태를 서버로 전송하여 그룹에 브로드캐스트
+            await hubConnection.SendAsync("SendSpeakingState", selectedVoiceChannel.ChannelId.ToString(), isSpeaking);
+        }
+    }
+
     // 프로필 영역 클릭 시 파일 선택창 띄우기
     private async Task TriggerProfileUpload()
     {
@@ -837,6 +861,10 @@
     {
         if (selectedVoiceChannel != null && hubConnection != null)
         {
+            // 분석 중지 및 상태 초기화
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopAudioAnalysis");
+            speakingStates.Clear(); // 상태 사전 초기화
+
             await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
             await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
             selectedVoiceChannel = null;
@@ -889,7 +917,7 @@
     // 헬퍼 메서드들
     private double GetPeerVolume(string id) => userVolumes.GetValueOrDefault(id, 1.0);
     private bool IsPeerMuted(string id) => userMutes.GetValueOrDefault(id, false);
-
+    private bool IsSpeaking(string connectionId) => speakingStates.GetValueOrDefault(connectionId, false);
 
     // IAsyncDisposable 구현 부분 수정
     public async ValueTask DisposeAsync()
