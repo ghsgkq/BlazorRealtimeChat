@@ -35,7 +35,8 @@ public class ChannelService(IChannelRepository channelRepository) : IChannelServ
         return new ChannelDto
         {
             ChannelId = createdChannel.ChannelId,
-            ChannelName = createdChannel.ChannelName
+            ChannelName = createdChannel.ChannelName,
+            Type = createChannelDto.Type
         };
     }
 
