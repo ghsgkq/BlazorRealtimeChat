@@ -276,3 +276,131 @@
 .user-profile .speaking-ring {
     box-shadow: 0 0 0 3px #23a559;
 }
+
+/* 채팅 이미지 호버 효과 */
+.chat-img:hover {
+    filter: brightness(0.8);
+}
+
+/* 모달 배경 */
+.image-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 모달 이미지 스타일 */
+.modal-content-wrapper {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+}
+
+.modal-image {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 4px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+/* 닫기 버튼 */
+.modal-close-btn {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+
+/* 채팅방 내부 미디어 스타일 */
+.chat-media {
+    border: 1px solid #444;
+    background-color: #000; /* 비디오 로딩 전 검은 배경 */
+    transition: filter 0.2s;
+}
+
+    .chat-media:hover {
+        filter: brightness(0.9);
+    }
+
+/* 비디오 위 오버레이 (확대 버튼) */
+.media-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0);
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 8px;
+}
+
+    .media-overlay i {
+        font-size: 1.5rem;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .media-overlay:hover {
+        background: rgba(0,0,0,0.3);
+    }
+
+        .media-overlay:hover i {
+            opacity: 1;
+        }
+
+/* 모달 백드롭 */
+.media-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: zoom-out;
+}
+
+.modal-content-container {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    cursor: default;
+}
+
+.modal-media-element {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 4px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.7);
+}
+
+.modal-close-x {
+    position: absolute;
+    top: -50px;
+    right: 0;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 3rem;
+    cursor: pointer;
+    line-height: 1;
+}

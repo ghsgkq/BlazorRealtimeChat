@@ -261,30 +261,78 @@
     <!-- 3. 메인 콘텐츠 (채팅창) -->
     <div class="main-content d-flex flex-column flex-grow-1">
         <div class="chat-messages flex-grow-1 p-3" @ref="chatMessagesBox" style="overflow-y: auto;">
-            @foreach (var message in chatMessages)
+            @foreach (var msg in chatMessages)
             {
-                <div class="d-flex mb-3">
-                    @((MarkupString)message)
+                <div class="d-flex mb-3 message-item">
+                    @* 아바타 *@
+                    <div class="flex-shrink-0">
+                        @if (!string.IsNullOrEmpty(msg.ProfileImageUrl))
+                        {
+                            <img src="@msg.ProfileImageUrl" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;" />
+                        }
+                        else
+                        {
+                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 40px; height: 40px;">
+                                @msg.UserName?[0].ToString().ToUpper()
+                            </div>
+                        }
+                    </div>
+
+                    @* 콘텐츠 *@
+                    <div class="flex-grow-1 ms-3">
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="fw-bold me-2" style="color: #00d1b2;">@msg.UserName</span>
+                            <span class="text-muted" style="font-size: 0.75rem;">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                        </div>
+
+                        @if (msg.MessageType == "text")
+                        {
+                            <div class="text-light">@msg.Content</div>
+                        }
+                        else if (msg.MessageType == "image")
+                        {
+                            <img src="@msg.FileUrl" @onclick="@(() => OpenMediaModal(msg.FileUrl, "image"))"
+                                 class="chat-media rounded mt-1 shadow-sm" style="max-width: 350px; cursor: pointer;" />
+                        }
+                        else if (msg.MessageType == "video")
+                        {
+                            <div class="mt-1">
+                                <video src="@msg.FileUrl"
+                                       controls
+                                       autoplay
+                                       muted
+                                       loop
+                                       class="chat-media rounded shadow-sm"
+                                       style="max-width: 350px; cursor: pointer;"
+                                       @onclick='() => OpenMediaModal(msg.FileUrl, "video")' />
+                            </div>
+                        }
+                        else
+                        {
+                            <a href="@msg.FileUrl" target="_blank" class="btn btn-sm btn-outline-info mt-1">📎 파일 다운로드</a>
+                        }
+                    </div>
                 </div>
             }
         </div>
-
-        <div class="chat-input p-3 bg-dark">
-            <div class="input-group">
-                @* 1. InputFile은 그대로 두되, ID를 확실히 지정합니다 *@
-                <InputFile OnChange="HandleFileSelected" id="fileInput" style="display:none;" />
-
-                @* 2. button 대신 label을 사용합니다. for="fileInput"이 핵심입니다! *@
-                @* 이 label을 클릭하면 브라우저가 알아서 ID가 fileInput인 요소를 클릭해줍니다. *@
-                <label for="fileInput" class="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center" style="cursor: pointer; width: 45px;">
-                    +
-                </label>
-
-                <input type="text" id="msgInput" class="form-control bg-dark text-light border-secondary"
-                       placeholder="@($"# {selectedTextChannel?.ChannelName ?? ""}에 메시지 보내기")"
-                       @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
+        @* --- 통합 미디어 모달 --- *@
+        @if (isMediaModalOpen)
+        {
+            <div class="media-modal-backdrop" @onclick="CloseMediaModal">
+                <div class="modal-content-container" @onclick:stopPropagation>
+                    @if (selectedMediaType == "image")
+                    {
+                        <img src="@selectedMediaUrl" class="modal-media-element" />
+                    }
+                    else if (selectedMediaType == "video")
+                    {
+                        @* 확대 모달에서는 소리가 나오도록 muted를 뺍니다 *@
+                        <video src="@selectedMediaUrl" controls autoplay class="modal-media-element" />
+                    }
+                    <button class="modal-close-x" @onclick="CloseMediaModal">×</button>
+                </div>
             </div>
-        </div>
+        }
     </div>
 </div>
 
@@ -306,7 +354,7 @@
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
     private HubConnection? hubConnection;
-    private List<string> chatMessages = new List<string>();
+    private List<MessageDto> chatMessages = new List<MessageDto>();
     private string? messageInput;
     private string? currentUsername;
     private bool isChatConnected => hubConnection?.State == HubConnectionState.Connected;
@@ -329,6 +377,26 @@
 
     // ConnectionId별 말하는 상태 저장 (true면 말하는 중)
     private Dictionary<string, bool> speakingStates = new();
+
+    // 모달 상태 관리 필드 추가
+    private bool isMediaModalOpen = false;
+    private string? selectedMediaUrl;
+    private string? selectedMediaType; // "image" 또는 "video"
+
+    // 모달 열기/닫기 메서드
+    private void OpenMediaModal(string url, string type)
+    {
+        selectedMediaUrl = url;
+        selectedMediaType = type;
+        isMediaModalOpen = true;
+    }
+
+    private void CloseMediaModal()
+    {
+        isMediaModalOpen = false;
+        selectedMediaUrl = null;
+        selectedMediaType = null;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -359,21 +427,31 @@
         // 메시지 수신 핸들러 등록
         hubConnection.On<string, string, string>("ReceiveMessage", async (user, userProfileUrl,message) =>
         {
-            var formattedMessage = FormatMessage(user,userProfileUrl, "text", "", DateTime.Now, message);
-            chatMessages.Add(formattedMessage);
+            chatMessages.Add(new MessageDto
+            {
+                UserName = user,
+                ProfileImageUrl = userProfileUrl,
+                Content = message,
+                MessageType = "text",
+                Timestamp = DateTime.Now
+            });
             await InvokeAsync(StateHasChanged);
-            // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
             await ScrollToBottomChatMessagesBox();
         });
 
         // 파일 메시지 수신 핸들러 등록
         hubConnection.On<string, string, string, string>("ReceiveMessageWithFile", async (userName,userProfileUrl, fileUrl, messageType) =>
         {
-            var fileMessageHtml = FormatMessage(userName, userProfileUrl, messageType, fileUrl, DateTime.Now, "");
-            chatMessages.Add(fileMessageHtml);
+            chatMessages.Add(new MessageDto
+            {
+                UserName = userName,
+                ProfileImageUrl = userProfileUrl,
+                FileUrl = fileUrl,
+                MessageType = messageType,
+                Timestamp = DateTime.Now
+            });
             await InvokeAsync(StateHasChanged);
-            // 메시지 최신화 후, 메시지 스크롤을 가장 아래로 내린다.
-            await Task.Delay(100);
+            await Task.Delay(100); // 렌더링 대기
             await ScrollToBottomChatMessagesBox();
 
         });
@@ -540,14 +618,16 @@
                 var history = await messageService.GetMessagesByChannelIdAsync(channel.ChannelId);
                 foreach (var msg in history)
                 {
-                    var formattedMessage = FormatMessage(
-                        msg.UserName,
-                        msg.ProfileImageUrl,
-                        msg.MessageType,
-                        msg.FileUrl,
-                        msg.Timestamp,
-                        msg.Content);
-                    chatMessages.Add(formattedMessage);
+                    chatMessages.Add(new MessageDto
+                    {
+                        ChannelId = msg.ChannelId,
+                        UserName = msg.UserName,
+                        ProfileImageUrl = msg.ProfileImageUrl,
+                        Content = msg.Content,
+                        FileUrl = msg.FileUrl,
+                        MessageType = msg.MessageType,
+                        Timestamp = msg.Timestamp
+                    });
                 }
 
                 // 3. 서버의 JoinChannel 메서드를 호출합니다.
@@ -744,29 +824,6 @@
             Console.WriteLine($"업로드 에러: {ex.Message}");
             await JSRuntime.InvokeVoidAsync("Swal.fire", "치명적 오류", $"파일 처리 중 오류 발생: {ex.Message}", "error");
         }
-    }
-
-    private string FormatMessage(string? userName, string? userProfileUrl, string type, string? fileUrl, DateTime timestamp, string? message)
-    {
-        // 프로필 이미지가 없으면 기본 원형 안에 첫 글자 표시
-        var avatar = !string.IsNullOrEmpty(userProfileUrl)
-            ? $"<img src='{userProfileUrl}' class='rounded-circle' style='width: 40px; height: 40px; object-fit: cover;' />"
-            : $"<div class='bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white' style='width: 40px; height: 40px;'>{userName[0]}</div>";
-
-        var header = $"<div class='d-flex align-items-center mb-1'><div class='fw-bold' style='color: #00d1b2;'>{userName}</div></div>";
-        var time = $"<div style='color:gray; font-size:0.75rem;'>{timestamp.ToLocalTime():HH:mm}</div>";
-
-        if (type == "image")
-            return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div><img src='{fileUrl}' style='max-width:350px; border-radius:12px; margin: 5px 0; border: 1px solid #444;' /></div>{time}</div>";
-
-        if (type == "video")
-            return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div><video src='{fileUrl}' controls style='max-width:350px; border-radius:12px; margin: 5px 0;' /></div>{time}</div>";
-
-        // 일반 파일인 경우 다운로드 링크 제공
-        if (type == "file")
-            return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div><a href='{fileUrl}' target='_blank' class='btn btn-sm btn-outline-info'>📎 파일 다운로드</a></div>{time}</div>";
-
-        return $"<div class='flex-shrink-0'>{avatar}</div><div class='flex-grow-1 ms-3'>{header}<div class='mt-1'>{message}</div>{time}</div>";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
