@@ -72,7 +72,7 @@
                 // 파일을 스트림 참조로 변환
                 const streamRef = DotNet.createJSStreamReference(file);
                 // [중요] C#의 매개변수 순서(fileName, contentType, streamRef)와 일치하게 보냅니다.
-                await dotNetHelper.invokeMethodAsync('HandleFileFromJS', file.name, file.type, streamRef);
+                await dotNetHelper.invokeMethodAsync('HandleFileFromJS', file.name, file.type, file.size.toString(), streamRef);
             }
         });
 
@@ -101,10 +101,24 @@
         };
 
         async function uploadFileFromJS(dotNetHelper, file) {
-            // 파일을 바이트 배열로 변환하여 C#으로 전달
-            const arrayBuffer = await file.arrayBuffer();
-            const byteArray = new Uint8Array(arrayBuffer);
-            await dotNetHelper.invokeMethodAsync('HandleFileFromJS', byteArray, file.name, file.type);
+            console.log("전송 데이터 확인:", {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                ref: "stream 생성 중..."
+            });
+
+            const streamRef = DotNet.createStreamReference(file);
+
+            // 호출 직전 로그 찍기
+            console.log("C# 호출 시작 - HandleFileFromJS");
+
+            await dotNetHelper.invokeMethodAsync('HandleFileFromJS',
+                file.name,      // 1
+                file.type,      // 2
+                file.size,      // 3 (이 값이 숫자여야 함)
+                streamRef       // 4
+            );
         }
     </script>
 </body>

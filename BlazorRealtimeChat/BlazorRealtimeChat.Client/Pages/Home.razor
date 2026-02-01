@@ -282,7 +282,7 @@
                     <div class="flex-grow-1 ms-3">
                         <div class="d-flex align-items-center mb-1">
                             <span class="fw-bold me-2" style="color: #00d1b2;">@msg.UserName</span>
-                            <span class="text-muted" style="font-size: 0.75rem;">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                            <span class="" style="font-size: 0.75rem;">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
                         </div>
 
                         @if (msg.MessageType == "text")
@@ -314,6 +314,35 @@
                     </div>
                 </div>
             }
+        </div>
+        <div class="chat-input p-3 bg-dark">
+            @if (isUploading)
+            {
+                <div class="upload-progress-container mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="small text-light"><i class="bi bi-cloud-arrow-up me-1"></i> 파일 업로드 중...</span>
+                        <span class="small text-light">@uploadPercentage%</span>
+                    </div>
+                    <div class="progress" style="height: 4px; background-color: #404249;">
+                        <div class="progress-bar" role="progressbar"
+                             style="width: @(uploadPercentage)%; background-color: #5865f2; transition: width 0.1s;"></div>
+                    </div>
+                </div>
+            }
+            <div class="input-group">
+                @* 1. InputFile은 그대로 두되, ID를 확실히 지정합니다 *@
+                <InputFile OnChange="HandleFileSelected" id="fileInput" style="display:none;" />
+
+                @* 2. button 대신 label을 사용합니다. for="fileInput"이 핵심입니다! *@
+                @* 이 label을 클릭하면 브라우저가 알아서 ID가 fileInput인 요소를 클릭해줍니다. *@
+                <label for="fileInput" class="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center" style="cursor: pointer; width: 45px;">
+                    +
+                </label>
+
+                <input type="text" id="msgInput" class="form-control bg-dark text-light border-secondary"
+                       placeholder="@($"# {selectedTextChannel?.ChannelName ?? ""}에 메시지 보내기")"
+                       @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
+            </div>
         </div>
         @* --- 통합 미디어 모달 --- *@
         @if (isMediaModalOpen)
@@ -382,6 +411,10 @@
     private bool isMediaModalOpen = false;
     private string? selectedMediaUrl;
     private string? selectedMediaType; // "image" 또는 "video"
+
+    // 파일 업로드 관련
+    private bool isUploading = false;
+    private int uploadPercentage = 0;
 
     // 모달 열기/닫기 메서드
     private void OpenMediaModal(string url, string type)
@@ -787,20 +820,19 @@
         var file = e.File;
         if (file == null) return;
 
-        // 파일 크기 체크 (예: 100MB 제한)
-        long maxAllowedSize = 100 * 1024 * 1024;
-        if (file.Size > maxAllowedSize)
-        {
-            await JSRuntime.InvokeVoidAsync("Swal.fire", "경고", "파일 크기가 너무 큽니다. (최대 100MB)", "warning");
-            return;
-        }
+        isUploading = true;
+        uploadPercentage = 0;
+        StateHasChanged(); // 로딩바 표시 시작
 
         try
         {
-            // 파일 업로드 호출
-            // 주의: fileService.UploadFileAsync 내부에서 stream을 열 때
-            // file.OpenReadStream(maxAllowedSize) 처럼 크기를 인자로 전달해야 합니다.
-            var uploadedFileDto = await fileService.UploadFileAsync(file);
+            // 두 번째 인자로 진행률 업데이트 로직을 전달함
+            var uploadedFileDto = await fileService.UploadFileAsync(file, (sent, total) =>
+            {
+                uploadPercentage = (int)((sent * 100) / total);
+                // 비동기 업로드 중이므로 UI 스레드에 갱신을 요청함
+                InvokeAsync(StateHasChanged);
+            });
 
             if (uploadedFileDto != null && selectedTextChannel != null && hubConnection?.State == HubConnectionState.Connected)
             {
@@ -809,20 +841,19 @@
 
                 await hubConnection.SendAsync("SendMessageWithFile",
                     selectedTextChannel.ChannelId.ToString(),
+                    currentProfileUrl,
                     uploadedFileDto.FileUrl,
                     messageType);
-            }
-            else
-            {
-                await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "업로드에 실패했거나 연결이 끊어졌습니다.", "error");
             }
         }
         catch (Exception ex)
         {
-            // 서버가 꺼지는 경우 여기도 도달하지 못할 수 있습니다.
-            // 이는 서버의 Program.cs 설정이 우선적으로 해결되어야 함을 의미합니다.
             Console.WriteLine($"업로드 에러: {ex.Message}");
-            await JSRuntime.InvokeVoidAsync("Swal.fire", "치명적 오류", $"파일 처리 중 오류 발생: {ex.Message}", "error");
+        }
+        finally
+        {
+            isUploading = false; // 업로드 완료 후 로딩바 숨김
+            StateHasChanged();
         }
     }
 
@@ -839,20 +870,36 @@
     }
 
     // javascript에서 호출할 메서드 예시
-    [JSInvokable]
-    public async Task HandleFileFromJS(string fileName, string contentType, IJSStreamReference streamRef)
+    // Home.razor @code 블록 내 수정
+    [JSInvokable("HandleFileFromJS")]
+    public async Task HandleFileFromJS(string fileName, string contentType, string fileSizeStr, IJSStreamReference streamRef)
     {
+        // 문자열을 long으로 변환
+        if (!long.TryParse(fileSizeStr, out long fileSize))
+        {
+            fileSize = 0; // 예외 처리
+        }
+        // 1. 업로드 상태 초기화
+        isUploading = true;
+        uploadPercentage = 0;
+        await InvokeAsync(StateHasChanged);
+
         try
         {
-            // JS로부터 스트림 열기 ( 최대 100MB)
+            // 2. JS로부터 스트림 열기
             using var stream = await streamRef.OpenReadStreamAsync(maxAllowedSize: 100 * 1024 * 1024);
-            // 파일 업로드 서비스 호출 (새로 만든 오버로드 사용)
-            var uploadedFileDto = await fileService.UploadFileAsync(stream, fileName, contentType);
+
+            var uploadedFileDto = await fileService.UploadFileAsync(stream, fileName, contentType, fileSize, (sent, total) =>
+            {
+                uploadPercentage = (int)((sent * 100) / total);
+                InvokeAsync(StateHasChanged);
+            });
 
             if (uploadedFileDto != null && selectedTextChannel != null && hubConnection?.State == HubConnectionState.Connected)
             {
                 string messageType = contentType.Contains("image") ? "image" :
                                      contentType.Contains("video") ? "video" : "file";
+
                 await hubConnection.SendAsync("SendMessageWithFile",
                     selectedTextChannel.ChannelId.ToString(),
                     currentProfileUrl,
@@ -861,14 +908,20 @@
             }
             else
             {
-                await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "드래그 앤 드랍 업로드에 실패했거나 연결이 끊어졌습니다.", "error");
+                await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "업로드에 실패했거나 연결이 끊어졌습니다.", "error");
             }
-
         }
         catch (Exception ex)
         {
             Console.WriteLine($"드래그 앤 드랍 업로드 에러: {ex.Message}");
-            await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "드래그 앤 드랍 업로드 중 오류가 발생했습니다.", "error");
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "파일 처리 중 오류가 발생했습니다.", "error");
+        }
+        finally
+        {
+            // 4. 업로드 종료 처리
+            isUploading = false;
+            uploadPercentage = 0;
+            await InvokeAsync(StateHasChanged);
         }
     }
 
