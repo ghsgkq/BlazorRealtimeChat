@@ -81,4 +81,26 @@ public class UserController(IUserService userService, ITokenService tokenService
 
         return Ok(user);
     }
+
+    [Authorize]
+    [HttpPut("update")]
+    public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDto updateUserDto)
+    {
+        // 토큰에서 현재 사용자 uid 를 가져온다.
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        // 서비스 호출
+        var result = await userService.UpdateUserAsync(Guid.Parse(userId), updateUserDto);
+
+        // 서비스 결과에 따른 처리
+        return result.Status switch
+        {
+            ResponseStatus.Ok => Ok(new { UserName = result.Data}),
+            ResponseStatus.NotFound => NotFound(result.Message),
+            ResponseStatus.BadRequest => BadRequest(result.Message),
+            _ => BadRequest(result)
+        };
+
+    }
 }

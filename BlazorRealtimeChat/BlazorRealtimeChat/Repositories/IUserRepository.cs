@@ -10,4 +10,6 @@ public interface IUserRepository
     Task<User?> GetUserByIdAsync(Guid userId);
     Task UpdateProfileImgeAsync(Guid userId, string profileImageUrl);
 
+    Task<User?> UpdateUserAsync(User user);
+
 }

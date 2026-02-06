@@ -404,3 +404,70 @@
     cursor: pointer;
     line-height: 1;
 }
+
+.profile-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 3000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.profile-card {
+    width: 340px;
+    background-color: #1e1f22;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.profile-banner {
+    height: 60px;
+}
+
+.profile-content {
+    position: relative;
+    padding-top: 45px !important;
+}
+
+.avatar-edit-wrapper {
+    position: absolute;
+    top: -35px;
+    left: 15px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 6px solid #1e1f22;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.profile-avatar-large {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-hint {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.avatar-edit-wrapper:hover .avatar-hint {
+    opacity: 1;
+}

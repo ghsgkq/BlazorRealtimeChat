@@ -10,4 +10,5 @@ public interface IUserService
     Task<User?> LoginUserAsync(UserLoginDto userDto);
     Task<(bool Success, string ErrorMessage)> UpdateProfileImageAsync(Guid userId, string imageUrl);
     Task<UserDto?> GetUserByUserIdAsncy(Guid userId);
+    Task<ServiceResponse<string>> UpdateUserAsync(Guid userId,UpdateUserDto updateUserDto);
 }

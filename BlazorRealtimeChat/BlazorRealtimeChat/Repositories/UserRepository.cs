@@ -40,4 +40,11 @@ public class UserRepository(RealTimeChatContext context) : IUserRepository
             Console.WriteLine($"사용자를 찾을 수 없음. ID: {userId}");
         }
     }
+
+    public async Task<User?> UpdateUserAsync(User user)
+    {
+        context.Users.Update(user);
+        await context.SaveChangesAsync();
+        return user;
+    }
 }

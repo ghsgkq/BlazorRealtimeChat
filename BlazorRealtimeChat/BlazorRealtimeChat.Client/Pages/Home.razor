@@ -238,24 +238,26 @@
                 </div>
             </div>
         }
-        <label for="profileInput" class="user-profile mt-auto p-3 d-flex align-items-center" style="cursor: pointer; width: 100%;">
+        @* 하단 프로필 섹션 *@
+        <div class="user-profile mt-auto p-3 d-flex align-items-center"
+             @onclick="OpenProfileModal" style="cursor: pointer;">
             @if (!string.IsNullOrEmpty(currentProfileUrl))
             {
-                <img src="@currentProfileUrl" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;" />
+                <img src="@currentProfileUrl" class="rounded-circle me-2 @(IsSpeaking(hubConnection?.ConnectionId ?? "") ? "speaking-ring" : "")"
+                     style="width: 32px; height: 32px; object-fit: cover;" />
             }
             else
             {
-                <span class="bg-primary rounded-circle me-2 text-white fw-bold"
-                      style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">
-                    @currentUsername?.Substring(0, 1).ToUpper()
-                </span>
+                <div class="bg-primary rounded-circle me-2 text-white fw-bold d-flex align-items-center justify-content-center"
+                     style="width: 32px; height: 32px; font-size: 0.9rem;">
+                    @currentUsername?[0].ToString().ToUpper()
+                </div>
             }
-            <span class="fw-bold">@currentUsername</span>
-
-            @* 2. InputFile은 label 바깥 혹은 안쪽 어디에 있어도 id만 일치하면 작동합니다. 
-          중요: label 안에 있을 때 클릭 이벤트가 꼬이지 않도록 스타일로 숨깁니다. *@
-            <InputFile OnChange="HandleProfileImageUpload" id="profileInput" style="display:none;" />
-        </label>
+            <div class="flex-grow-1 overflow-hidden">
+                <div class="fw-bold text-truncate" style="font-size: 0.9rem;">@currentUsername</div>
+            </div>
+            <i class="bi bi-gear-fill text-secondary ms-2"></i>
+        </div>
     </div>
 
     <!-- 3. 메인 콘텐츠 (채팅창) -->
@@ -365,6 +367,37 @@
     </div>
 </div>
 
+@if (isProfileModalOpen)
+{
+    <div class="profile-modal-backdrop" @onclick="CloseProfileModal">
+        <div class="profile-card" @onclick:stopPropagation>
+            @* 상단 배너 색상 *@
+            <div class="profile-banner bg-primary"></div>
+
+            <div class="profile-content p-3">
+                @* 아바타 영역 (클릭 시 사진 변경) *@
+                <div class="avatar-edit-wrapper" @onclick="@(() => JSRuntime.InvokeVoidAsync("clickElement", "profileInput"))">
+                    <img src="@(string.IsNullOrEmpty(currentProfileUrl) ? "default-avatar.png" : currentProfileUrl)" class="profile-avatar-large" />
+                    <div class="avatar-hint"><i class="bi bi-camera-fill"></i></div>
+                </div>
+                <InputFile OnChange="HandleProfileImageUpload" id="profileInput" style="display:none;" />
+
+                @* 유저 정보 수정 *@
+                <div class="mt-4">
+                    <label class="small fw-bold text-secondary text-uppercase mb-2">사용자명</label>
+                    <input type="text" class="discord-input w-100 mb-3" @bind="editUsername" />
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="CloseProfileModal">취소</button>
+                    <button class="btn btn-sm btn-discord" @onclick="SaveProfileChanges">변경사항 저장하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
 @code {
     private List<ServerDto> servers = new List<ServerDto>();
     private List<ChannelDto> channels = new List<ChannelDto>();
@@ -416,6 +449,10 @@
     private bool isUploading = false;
     private int uploadPercentage = 0;
 
+    // 프로필 모달 상태 관리
+    private bool isProfileModalOpen = false;
+    private string? editUsername;
+
     // 모달 열기/닫기 메서드
     private void OpenMediaModal(string url, string type)
     {
@@ -443,6 +480,17 @@
 
         // 2. 서버 목록은 바로 불러옵니다.
         await LoadInitialServers();
+    }
+
+    private void OpenProfileModal()
+    {
+        editUsername = currentUsername; // 현재 이름 불러오기
+        isProfileModalOpen = true;
+    }
+
+    private void CloseProfileModal()
+    {
+        isProfileModalOpen = false;
     }
 
     private async Task InitializeSignalR()
@@ -1022,6 +1070,23 @@
             openMenuConnectionId = connectionId;
         }
         StateHasChanged(); // UI 갱신 필요
+    }
+
+    private async Task SaveProfileChanges()
+    {
+        if (string.IsNullOrWhiteSpace(editUsername)) return;
+
+        var success = await userService.UpdateUserAsync(new UpdateUserDto
+        {
+            UserName = editUsername
+        });
+        if (success)
+        {
+            currentUsername = editUsername;
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "성공", "프로필이 업데이트되었습니다.", "success");
+            CloseProfileModal();
+            StateHasChanged();
+        }
     }
 
     // 헬퍼 메서드들

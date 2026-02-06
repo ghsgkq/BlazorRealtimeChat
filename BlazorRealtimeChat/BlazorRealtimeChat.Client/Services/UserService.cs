@@ -30,5 +30,12 @@ namespace BlazorRealtimeChat.Client.Services
         {
             return await _httpClient.GetFromJsonAsync<UserDto>("api/user/me");
         }
+
+        public async Task<bool> UpdateUserAsync(UpdateUserDto updateUserDto)
+        {
+            var response = await _httpClient.PutAsJsonAsync("api/user", updateUserDto);
+            return response.IsSuccessStatusCode;
+        }
+
     }
 }

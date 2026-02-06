@@ -81,4 +81,24 @@ public class UserService(IUserRepository userRepository) : IUserService
             ProfileImageUrl = user.ProfileImageUrl
         };
     }
+
+    public async Task<ServiceResponse<string>> UpdateUserAsync(Guid userId,UpdateUserDto updateUserDto)
+    {
+        var response = new ServiceResponse<string>();
+
+        var user = await userRepository.GetUserByIdAsync(userId);
+        if (user == null)
+        {
+            response.Success = false;
+            response.Status = ResponseStatus.NotFound;
+            response.Message = "사용자를 찾을 수 없습니다.";
+            return response;
+        }
+
+        user.UserName = updateUserDto.UserName;
+        await userRepository.UpdateUserAsync(user);
+
+        response.Data = user.UserName;
+        return response;
+    }
 }
