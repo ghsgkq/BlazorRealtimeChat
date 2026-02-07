@@ -12,7 +12,7 @@ namespace BlazorRealtimeChat.Services
             {
                 MessageId = m.MessageId,
                 ChannelId = m.ChannelId,
-                UserId = m.User.UserId,
+                UserId = m.User.Id,
                 Content = m.Content,
                 Timestamp = m.Timestamp,
                 ChannelName = m.Channel.ChannelName,

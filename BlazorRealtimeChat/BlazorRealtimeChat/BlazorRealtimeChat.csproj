@@ -19,4 +19,8 @@
 		<ProjectReference Include="..\BlazorRealtimeChat.Shared\BlazorRealtimeChat.Shared.csproj" />
 		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="ExternalUploads\" />
+	</ItemGroup>
 </Project>

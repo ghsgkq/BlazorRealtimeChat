@@ -16,5 +16,12 @@ public class RealTimeChatContext : DbContext
     public DbSet<Server> Servers { get; set; }
     public DbSet<Channel> Channels { get; set; }
     public DbSet<Message> Messages { get; set; }
-    
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // LoginId에 유니크 인덱스를 설정하여 중복 가입
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.LoginId)
+            .IsUnique();
+    }
 }

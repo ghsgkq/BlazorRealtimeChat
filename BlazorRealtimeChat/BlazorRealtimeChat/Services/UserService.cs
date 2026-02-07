@@ -11,10 +11,17 @@ public class UserService(IUserRepository userRepository) : IUserService
     public async Task<(bool Success, string ErrorMessage)> RegisterUserAsync(UserRegisterDto userDto)
     {
         // 1. 사용자 이름 중복 확인
-        var existingUser = await userRepository.GetUserByUsernameAsync(userDto.Username);
+        var existingUser = await userRepository.GetUserByUsernameAsync(userDto.UserName);
         if (existingUser != null)
         {
-            return (false, "Username already exists.");
+            return (false, "사용자 이름 중복 확인");
+        }
+
+        // 2. 사용자 아이디 중복 확인
+        var existingLoginId = await userRepository.GetUserByLoginIdAsync(userDto.LoginId);
+        if (existingLoginId != null)
+        {
+            return (false, "사용자 아이디 중복");
         }
 
         // 2. 비밀번호 해싱
@@ -23,7 +30,8 @@ public class UserService(IUserRepository userRepository) : IUserService
 
         var newUser = new User
         {
-            UserName = userDto.Username,
+            LoginId = userDto.LoginId,
+            UserName = userDto.UserName,
             PasswordHash = passwordHash,
             CreatedAt = DateTime.UtcNow
         };
@@ -37,8 +45,8 @@ public class UserService(IUserRepository userRepository) : IUserService
 
     public async Task<User?> LoginUserAsync(UserLoginDto userDto)
     {
-        // 1. 사용자 이름으로 사용자 정보 조회
-        var user = await userRepository.GetUserByUsernameAsync(userDto.Username);
+        // 1. 사용자 아이디로 사용자 정보 조회
+        var user = await userRepository.GetUserByLoginIdAsync(userDto.LoginId);
         if (user == null)
         {
             return null; // 사용자 없음
@@ -54,21 +62,21 @@ public class UserService(IUserRepository userRepository) : IUserService
         return user;
     }
 
-    public async Task<(bool Success, string ErrorMessage)> UpdateProfileImageAsync(Guid userId, string imageUrl)
+    public async Task<(bool Success, string ErrorMessage)> UpdateProfileImageAsync(Guid id, string imageUrl)
     {
-        var user = await userRepository.GetUserByIdAsync(userId);
+        var user = await userRepository.GetUserByIdAsync(id);
         if (user == null)
         {
             return (false, "User not found.");
         }
         user.ProfileImageUrl = imageUrl;
-        await userRepository.UpdateProfileImgeAsync(userId, imageUrl);
+        await userRepository.UpdateProfileImgeAsync(id, imageUrl);
         return (true, "");
     }
 
-    public async Task<UserDto?> GetUserByUserIdAsncy(Guid userId)
+    public async Task<UserDto?> GetUserByUserIdAsncy(Guid id)
     {
-        var user = await userRepository.GetUserByIdAsync(userId);
+        var user = await userRepository.GetUserByIdAsync(id);
         if (user == null)
         {
             return null;
@@ -76,17 +84,18 @@ public class UserService(IUserRepository userRepository) : IUserService
 
         return new UserDto
         {
-            UserId = user.UserId,
+            Id = user.Id,
+            LoginId = user.LoginId,
             UserName = user.UserName,
             ProfileImageUrl = user.ProfileImageUrl
         };
     }
 
-    public async Task<ServiceResponse<string>> UpdateUserAsync(Guid userId,UpdateUserDto updateUserDto)
+    public async Task<ServiceResponse<string>> UpdateUserAsync(Guid id,UpdateUserDto updateUserDto)
     {
         var response = new ServiceResponse<string>();
 
-        var user = await userRepository.GetUserByIdAsync(userId);
+        var user = await userRepository.GetUserByIdAsync(id);
         if (user == null)
         {
             response.Success = false;

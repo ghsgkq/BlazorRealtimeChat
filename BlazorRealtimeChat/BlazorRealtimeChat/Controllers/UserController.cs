@@ -83,7 +83,6 @@ public class UserController(IUserService userService, ITokenService tokenService
     }
 
     [Authorize]
-    [HttpPut("update")]
     public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDto updateUserDto)
     {
         // 토큰에서 현재 사용자 uid 를 가져온다.

@@ -4,6 +4,6 @@ namespace BlazorRealtimeChat.Client.Services;
 
 public interface IAuthService
 {
-    Task<bool> LoginAsync(string userName, string password);
+    Task<bool> LoginAsync(string loginId, string password);
     Task LogoutAsync();
 }

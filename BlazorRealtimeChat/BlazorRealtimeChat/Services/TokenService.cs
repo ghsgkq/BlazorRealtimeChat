@@ -20,7 +20,7 @@ public class TokenService(IConfiguration config) : ITokenService
         // 클레임(Claim) 설정 : 토큰에 담을 정보
         var claim = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Name, user.UserName)
         };
 

@@ -12,11 +12,11 @@ public class RegisterService : IRegisterService
     {
         _httpClient = httpClient;
     }
-    public async Task<bool> RegisterAsync(string userName, string password, string confirmPassword)
+    public async Task<bool> RegisterAsync(string loginId,string userName, string password, string confirmPassword)
     {
 
         // Simple validation logic for demonstration purposes
-        if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirmPassword))
+        if (string.IsNullOrWhiteSpace(loginId) || string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirmPassword))
         {
             return false; // Registration failed due to empty fields
         }
@@ -28,7 +28,8 @@ public class RegisterService : IRegisterService
 
         var registerDto = new UserRegisterDto
         {
-            Username = userName,
+            UserName = userName,
+            LoginId = loginId,
             Password = password
         };
 

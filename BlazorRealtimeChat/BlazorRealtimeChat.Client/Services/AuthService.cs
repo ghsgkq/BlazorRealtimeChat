@@ -19,11 +19,11 @@ public class AuthService : IAuthService
         _authenticationStateProvider = authenticationStateProvider;
     }
 
-    public async Task<bool> LoginAsync(string userName, string password)
+    public async Task<bool> LoginAsync(string loginId, string password)
     {
         var userDto = new UserLoginDto
         {
-            Username = userName,
+            LoginId = loginId,
             Password = password
         };
 

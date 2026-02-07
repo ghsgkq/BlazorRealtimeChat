@@ -23,8 +23,8 @@
 
                     <div class="mb-3">
                         <label for="UserName" class="form-label text-uppercase small fw-bold text-light">아이디</label>
-                        <InputText id="UserName" class="form-control form-control-lg bg-dark text-light border-secondary" @bind-Value="loginModel.UserName" />
-                        <ValidationMessage For="@(() => loginModel.UserName)" />
+                    <InputText id="UserName" class="form-control form-control-lg bg-dark text-light border-secondary" @bind-Value="loginModel.LoginId" />
+                    <ValidationMessage For="@(() => loginModel.LoginId)" />
                     </div>
 
                     <div class="mb-3">
@@ -79,7 +79,7 @@
             return;
         }
         isProcessing = true;
-        var success = await AuthService.LoginAsync(loginModel.UserName, loginModel.Password);
+        var success = await AuthService.LoginAsync(loginModel.LoginId, loginModel.Password);
         
         if (success)
         {
@@ -97,7 +97,7 @@
     public class LoginModel
     {
         [Required(ErrorMessage = "이메일 또는 전화번호를 입력하세요.")]
-        public string UserName { get; set; }
+        public string LoginId { get; set; }
 
         [Required(ErrorMessage = "비밀번호를 입력하세요.")]
         public string Password { get; set; }
