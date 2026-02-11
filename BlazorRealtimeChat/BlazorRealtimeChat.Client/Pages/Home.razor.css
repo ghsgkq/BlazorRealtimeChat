@@ -471,3 +471,43 @@
 .avatar-edit-wrapper:hover .avatar-hint {
     opacity: 1;
 }
+
+/* 인라인 알림 스타일 */
+.inline-alert {
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+}
+
+.alert-success {
+    background-color: rgba(35, 165, 89, 0.15); /* 디스코드 녹색 테마 */
+    color: #23a559;
+    border: 1px solid #23a559;
+}
+
+.alert-danger {
+    background-color: rgba(242, 63, 66, 0.15); /* 디스코드 빨간색 테마 */
+    color: #f23f42;
+    border: 1px solid #f23f42;
+}
+
+/* 애니메이션 효과 (Animate.css 라이브러리가 없다면 간단히 추가) */
+.animate__fadeIn {
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
