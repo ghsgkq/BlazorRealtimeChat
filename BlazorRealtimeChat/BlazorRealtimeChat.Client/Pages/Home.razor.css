@@ -511,3 +511,9 @@
         transform: translateY(0);
     }
 }
+
+.hover-light:hover {
+    color: white !important;
+    transform: rotate(30deg); /* 톱니바퀴가 살짝 돌아가는 효과 */
+    transition: all 0.2s;
+}

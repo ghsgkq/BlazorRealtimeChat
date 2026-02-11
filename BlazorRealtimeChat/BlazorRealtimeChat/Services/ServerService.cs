@@ -20,12 +20,13 @@ public class ServerService(
     }
 
     // 서버 생성
-    public async Task<ServerDto> AddServerAsync(CreateServerDto createServerDto)
+    public async Task<ServerDto> AddServerAsync(CreateServerDto createServerDto, Guid ownerId)
     {
         // 1. 서버 생성
         var newServer = new Data.Entity.Server
         {
-            ServerName = createServerDto.ServerName
+            ServerName = createServerDto.ServerName,
+            OwnerId = ownerId
         };
 
         var createdServer = await serverRepository.AddServerAsync(newServer);
@@ -41,7 +42,9 @@ public class ServerService(
         return new ServerDto
         {
             ServerId = createdServer.ServerId,
-            ServerName = createdServer.ServerName
+            ServerName = createdServer.ServerName,
+            OwnerId = createdServer.OwnerId
+
         };
     }
 }

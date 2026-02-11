@@ -5,6 +5,6 @@ namespace BlazorRealtimeChat.Services;
 public interface IServerService
 {
     Task<IEnumerable<ServerDto>> GetServersAsync();
-    Task<ServerDto> AddServerAsync(CreateServerDto createServerDto);
+    Task<ServerDto> AddServerAsync(CreateServerDto createServerDto, Guid ownerId);
     
 }

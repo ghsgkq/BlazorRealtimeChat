@@ -47,6 +47,13 @@
         {
             <div class="p-3 border-bottom border-secondary">
                 <h5 class="fw-bold mb-0">@selectedServer.ServerName</h5>
+                @* 현재 로그인한 사용자가 서버 주인인 경우에만 톱니바퀴 버튼 표시 *@
+                @if (selectedServer.OwnerId == currentUserId)
+                {
+                    <button class="btn btn-sm text-secondary p-0 hover-light" @onclick="OpenServerSettings">
+                        <i class="bi bi-gear-fill"></i>
+                    </button>
+                }
             </div>
             <div class="d-flex justify-content-between align-items-center p-3">
                 <span class="small text-uppercase">채널</span>
@@ -428,6 +435,9 @@
     private List<MessageDto> chatMessages = new List<MessageDto>();
     private string? messageInput;
     private string? currentUsername;
+    private Guid currentUserId; // 현재 로그인한 사용자의 ID 저장용
+    private string? currentProfileUrl; // 현재 사용자의 프로필 URL
+
     private bool isChatConnected => hubConnection?.State == HubConnectionState.Connected;
 
     private Task? _signalRInitTask; // SignalR 초기화 상태를 추적하는 태스크
@@ -436,7 +446,7 @@
 
     private DotNetObjectReference<Home>? _objRef; // 필드로 선언
 
-    private string? currentProfileUrl; // 현재 사용자의 프로필 URL
+    
 
     private Dictionary<string, List<VoiceUserDto>> voiceRoomUsers = new();
 
@@ -464,6 +474,8 @@
     private bool isProfileUpdateSuccess = false;
     private string? profileUpdateMessage;
 
+    
+
     // 모달 열기/닫기 메서드
     private void OpenMediaModal(string url, string type)
     {
@@ -485,6 +497,7 @@
         var userInfo = await userService.GetUserByUserIdAsync();
         currentUsername = userInfo?.UserName ?? "Anonymous";
         currentProfileUrl = userInfo?.ProfileImageUrl;
+        currentUserId = userInfo.Id;
 
         // 1. 초기화 태스크를 변수에 저장합니다. (await 하지 않고 바로 다음으로 넘어감)
         _signalRInitTask = InitializeSignalR();
@@ -1135,6 +1148,12 @@
             profileUpdateMessage = "업데이트에 실패했습니다. 다시 시도해 주세요.";
             StateHasChanged();
         }
+    }
+
+    private void OpenServerSettings()
+    {
+        // 서버 삭제나 이름 수정을 할 수 있는 모달을 띄우는 로직을 여기에 넣습니다.
+        Console.WriteLine("서버 설정 모달 열기");
     }
 
     // 헬퍼 메서드들
