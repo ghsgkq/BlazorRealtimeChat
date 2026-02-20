@@ -17,11 +17,18 @@ public class RealTimeChatContext : DbContext
     public DbSet<Channel> Channels { get; set; }
     public DbSet<Message> Messages { get; set; }
 
+    public DbSet<ServerMember> ServerMembers {get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // LoginId에 유니크 인덱스를 설정하여 중복 가입
         modelBuilder.Entity<User>()
             .HasIndex(u => u.LoginId)
+            .IsUnique();
+
+        // 한 유자가 같은 서버에 중복 가입하는 것을 방지.
+        modelBuilder.Entity<ServerMember>()
+            .HasIndex(sm => new { sm.ServerId, sm.UserId})
             .IsUnique();
     }
 }

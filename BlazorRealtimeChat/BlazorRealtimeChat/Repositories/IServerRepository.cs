@@ -5,6 +5,6 @@ namespace BlazorRealtimeChat.Repositories;
 
 public interface IServerRepository
 {
-    Task<IEnumerable<Server>> GetServersAsync();
+    Task<IEnumerable<Server>> GetServersAsync(Guid userId);
     Task<Server> AddServerAsync(Server server);
 }

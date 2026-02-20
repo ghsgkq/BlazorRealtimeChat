@@ -7,10 +7,14 @@ namespace BlazorRealtimeChat.Repositories;
 
 public class ServerRepository(RealTimeChatContext context) : IServerRepository
 {
-    public async Task<IEnumerable<Server>> GetServersAsync()
+    public async Task<IEnumerable<Server>> GetServersAsync(Guid userId)
     {
-        // 모든 서버를 이름순으로 정렬하여 반환
-        return await context.Servers.OrderBy(s => s.ServerName).ToListAsync();
+        // 초대된 서버를 이름순으로 정렬하여 반환
+        return await context.Servers
+            .Where(s => s.OwnerId == userId || 
+                        context.ServerMembers.Any(sm => sm.ServerId == s.ServerId && sm.UserId == userId))
+            .OrderBy(s => s.ServerName)
+            .ToListAsync();
     }
 
     public async Task<Server> AddServerAsync(Server server)

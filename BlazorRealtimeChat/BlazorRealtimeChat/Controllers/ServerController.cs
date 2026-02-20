@@ -14,7 +14,10 @@ public class ServerController(IServerService serverService) : Controller
     [HttpGet]
     public async Task<IActionResult> GetServers()
     {
-        var servers = await serverService.GetServersAsync();
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        var servers = await serverService.GetServersAsync(Guid.Parse(userId));
         return Ok(servers);
     }
 

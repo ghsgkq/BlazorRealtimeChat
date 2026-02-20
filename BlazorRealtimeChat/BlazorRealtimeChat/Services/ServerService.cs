@@ -1,15 +1,17 @@
-﻿using BlazorRealtimeChat.Repositories;
+﻿using BlazorRealtimeChat.Data.Entity;
+using BlazorRealtimeChat.Repositories;
 using BlazorRealtimeChat.Shared.DTOs;
 
 namespace BlazorRealtimeChat.Services;
 
 public class ServerService(
     IServerRepository serverRepository, 
-    IChannelRepository channelRepository) : IServerService
+    IChannelRepository channelRepository,
+    IServerMemberRepository serverMemberRepository) : IServerService
 {
-    public async Task<IEnumerable<ServerDto>> GetServersAsync()
+    public async Task<IEnumerable<ServerDto>> GetServersAsync(Guid userId)
     {
-        var servers = await serverRepository.GetServersAsync();
+        var servers = await serverRepository.GetServersAsync(userId);
         
         // 데이터베이스 엔티티(Server)를 프론트엔드 DTO(ServerDto)로 반환합니다.
         return servers.Select(server => new ServerDto()
@@ -31,7 +33,16 @@ public class ServerService(
 
         var createdServer = await serverRepository.AddServerAsync(newServer);
 
-        // 2. 기본 채널 추가하기
+        var ownerMember = new Data.Entity.ServerMember
+        {
+            ServerId = createdServer.ServerId,
+            UserId = ownerId  
+        };
+
+        // 2. 서버 자동 초대
+        await serverMemberRepository.AddServerMemberAsync(ownerMember);
+
+        // 3. 기본 채널 추가하기
         var defaultChannel = new Data.Entity.Channel
         {
             ChannelName = "일반",

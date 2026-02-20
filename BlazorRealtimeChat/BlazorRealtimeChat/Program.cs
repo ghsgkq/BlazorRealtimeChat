@@ -31,6 +31,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IChannelRepository, ChannelRepository>();
 builder.Services.AddScoped<IServerRepository, ServerRepository>();
 builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+builder.Services.AddScoped<IServerMemberRepository, ServerMemberRepository>();
 
 // Service 등록 시, 전체 네임스페이스 또는 별칭을 사용하여 혼동을 방지합니다.
 builder.Services.AddScoped<ServerSideServices.IUserService, ServerSideServices.UserService>();
