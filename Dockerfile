@@ -1,8 +1,8 @@
-# 1. 빌드 스테이지
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# 1. 빌드 스테이지 (.NET 9.0 SDK 사용)
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# 솔루션 및 프로젝트 파일 복사 (캐시 최적화)
+# 솔루션 및 프로젝트 파일 복사
 COPY ["BlazorRealtimeChat.sln", "./"]
 COPY ["BlazorRealtimeChat/BlazorRealtimeChat/BlazorRealtimeChat.csproj", "BlazorRealtimeChat/BlazorRealtimeChat/"]
 COPY ["BlazorRealtimeChat/BlazorRealtimeChat.Client/BlazorRealtimeChat.Client.csproj", "BlazorRealtimeChat/BlazorRealtimeChat.Client/"]
@@ -16,8 +16,8 @@ COPY . .
 WORKDIR "/src/BlazorRealtimeChat/BlazorRealtimeChat"
 RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 
-# 2. 실행 스테이지 (가벼운 런타임 이미지 사용)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+# 2. 실행 스테이지 (.NET 9.0 런타임 사용)
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 EXPOSE 8080
 
