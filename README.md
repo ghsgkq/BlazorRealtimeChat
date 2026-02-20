@@ -1,84 +1,73 @@
-# 💬 Blazor Real-Time Chat (Discord Clone)
+# 💬 P2P Real-Time Chat (Discord Clone)
 
-![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat-square&logo=dotnet&logoColor=white)
 ![Blazor](https://img.shields.io/badge/Blazor-WASM-512BD4?style=flat-square&logo=blazor&logoColor=white)
 ![SignalR](https://img.shields.io/badge/SignalR-RealTime-0078D4?style=flat-square)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
 ![WebRTC](https://img.shields.io/badge/WebRTC-Voice%20Chat-333333?style=flat-square&logo=webrtc&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 
-사용자 간의 실시간 텍스트 및 음성 통신을 지원하는 디스코드(Discord) 스타일의 웹 애플리케이션입니다. **Blazor WebAssembly**와 **ASP.NET Core SignalR**을 활용하여 빠르고 반응성 높은 SPA(Single Page Application)를 구축했으며, **WebRTC**를 통해 브라우저 간 P2P 음성 통화를 구현했습니다.
+사용자 간의 실시간 텍스트 채팅 및 음성 통화를 지원하는 디스코드(Discord) 스타일의 SPA 웹 애플리케이션입니다. 
+
+**🔗 라이브 데모:** [https://chat.ghsgkq.xyz](https://chat.ghsgkq.xyz)
+*(💡 라즈베리파이 홈 서버로 구동 중입니다. 빠른 테스트를 위해 아래 게스트 계정을 사용해 보세요!)*
+> **Test Account 1:** `ckdgus5820` / `qwer1234!@`
+> **Test Account 2:** `ckdgus1234` / `qwer1234!@`
+
+---
+
+## 📸 Preview (시연 화면)
+![image](/img/Preview01.gif)
+![image](/img/Preview02.gif)
+![image](/img/Preview03.gif)
+---
 
 ## 🚀 Key Features (핵심 기능)
 
-* **실시간 채팅 (SignalR)**
-    * 새로고침 없이 즉각적으로 메시지를 주고받는 텍스트 채널.
-    * 메시지 수신 시 자동 스크롤 및 읽음 처리 최적화.
-* **음성 통화 (WebRTC + SignalR Signaling)**
-    * 음성 채널 접속 시 사용자 간 P2P 오디오 스트리밍 연결.
-    * 개별 사용자 볼륨 조절, 마이크 음소거, 실시간 발화 상태(Speaking Indicator) 시각화.
-* **리치 미디어 및 파일 업로드**
-    * 드래그 앤 드롭(Drag & Drop)을 통한 직관적인 파일 업로드.
-    * 실시간 업로드 진행률 바(Progress Bar) 구현.
-    * 이미지 및 비디오 전송 시 썸네일 제공 및 클릭 시 전체 화면 확대 모달 제공.
-* **서버 및 채널 기반 아키텍처**
-    * 사용자가 직접 서버를 생성하고 소유권(Owner) 획득 및 관리.
-    * 서버 내 텍스트/음성 채널 분리 생성.
-    * `LoginId` 기반의 서버 초대 시스템 (초대받은 유저만 서버 접근 가능).
-* **사용자 인증 및 프로필 관리**
-    * JWT(JSON Web Token) 기반의 안전한 인증 및 권한 인가.
-    * `LoginId`(불변 계정)와 `UserName`(가변 닉네임)을 분리한 유연한 데이터베이스 설계.
-    * 디스코드 스타일의 미니 프로필 모달을 통한 닉네임 및 아바타 이미지 실시간 변경.
+* **실시간 통신 (SignalR & WebRTC)**
+    * **SignalR**을 활용한 지연 없는 텍스트 메시지 및 미디어 파일 전송.
+    * **WebRTC**를 이용한 브라우저 간 P2P 음성 통화 및 발화 상태(Speaking Indicator) 실시간 동기화.
+* **디스코드형 서버/채널 시스템**
+    * 텍스트 채널과 음성 채널의 명확한 분리 및 관리.
+* **UX 중심의 파일 업로드**
+    * Drag & Drop을 통한 직관적인 파일 업로드 및 실시간 진행률(Progress Bar) 표시.
+    * Stream 기반 청크 전송으로 대용량 파일 전송 시 메모리 최적화.
+* **유연한 사용자 프로필**
+    * `LoginId`(고유계정)와 `UserName`(가변 닉네임)을 DB 단에서 완벽히 분리하여, 자유로운 닉네임/프로필 사진 변경 지원.
 
-## 🛠️ Tech Stack (기술 스택)
+---
 
-**Frontend**
-* C# / Blazor WebAssembly
-* HTML5 / CSS3 (Discord-like Dark Theme)
-* JavaScript Interop (WebRTC API, Drag & Drop API)
-* SweetAlert2 (Custom UI Alerts)
+## 🏗️ Architecture & Technical Highlights (기술적 고민과 해결)
 
-**Backend**
-* C# / ASP.NET Core Web API
-* SignalR (WebSocket 통신 및 WebRTC Signaling Server 역할)
-* BCrypt.Net (비밀번호 해싱)
+### 1. WebRTC 시그널링 서버의 일원화
+WebRTC P2P 통신을 맺기 위한 SDP(Session Description Protocol) 교환 과정을 위해 별도의 시그널링 서버를 구축하는 대신, 기존 채팅에 사용하던 **SignalR Hub를 시그널링 서버로 재활용**했습니다. 이를 통해 백엔드 구조를 단순화하고 소켓 연결 리소스를 최적화했습니다.
 
-**Database & ORM**
-* PostgreSQL
-* Entity Framework Core (Code-First Migration)
+### 2. Stream 청크 기반 대용량 파일 처리
+이미지/비디오 업로드 시 서버 메모리 부족(OOM) 현상을 방지하기 위해 `ProgressStreamContent`를 직접 구현했습니다. 전체 파일을 한 번에 메모리에 올리지 않고 Stream을 통해 일정 크기(Chunk)로 나누어 전송하며, 이 전송량을 클라이언트 UI의 로딩바에 실시간으로 반영하여 UX를 크게 개선했습니다.
 
-## 🏗️ Architecture & Technical Highlights (기술적 주안점)
+### 3. 라즈베리파이 & Docker 기반 홈 인프라 배포
+클라우드 플랫폼에 의존하지 않고, 물리적 라즈베리파이(ARM64) 서버에 직접 인프라를 구축했습니다. `Docker Compose`를 활용해 .NET 서버와 PostgreSQL 컨테이너를 띄우고, 브라우저 마이크 권한 획득(WebRTC 필수 요건)을 위해 `Nginx Proxy Manager`로 역방향 프록시를 구성하고 무료 SSL(Let's Encrypt)을 적용하여 안전한 HTTPS 환경을 완성했습니다.
 
-### 1. WebRTC & SignalR 연동 메커니즘
-순수 WebRTC는 브라우저 간 직접 연결(P2P)을 지향하지만, 서로를 찾기 위한 **시그널링(Signaling)** 과정이 필수적입니다. 본 프로젝트에서는 별도의 시그널링 서버를 구축하는 대신, 기존 채팅에 사용하던 **SignalR Hub를 시그널링 채널로 재활용**하여 서버 리소스를 최적화하고 구조를 단순화했습니다. `JS Interop`을 통해 Blazor(C#)와 브라우저 API(JS)를 매끄럽게 연결했습니다.
+---
 
-### 2. Stream 처리를 통한 대용량 파일 업로드
-대용량 미디어 파일 전송 시 메모리 부족(OOM) 현상을 방지하고 사용자 경험을 향상시키기 위해, 전체 파일을 메모리에 올리지 않고 **스트림(Stream) 기반의 청크 단위 전송**을 구현했습니다. `ProgressStreamContent` 커스텀 클래스를 작성하여 업로드 진행률을 클라이언트 UI(로딩바)에 실시간으로 동기화했습니다.
+## 🛠️ Tech Stack
 
-### 3. 확장성을 고려한 DB 정규화 및 리팩토링
-초기에는 `UserName`을 로그인 아이디와 표시 이름으로 혼용했으나, 사용자 편의성(자유로운 닉네임 변경)과 데이터 무결성을 위해 `Id(PK)`, `LoginId(고유 계정)`, `UserName(표시 이름)`으로 역할을 명확히 분리하는 리팩토링을 단행했습니다. 또한, `ServerMember` 조인 테이블을 추가하여 N:M 관계의 다중 사용자-서버 구조를 완성했습니다.
+* **Frontend:** C# / Blazor WebAssembly / JS Interop / HTML5 / CSS3
+* **Backend:** ASP.NET Core 9.0 Web API / SignalR / P2P WebRTC / JWT / BCrypt.Net
+* **Database & ORM:** PostgreSQL / Entity Framework Core
+* **Infra:** Raspberry Pi / Docker Compose / Nginx Proxy Manager / Let's Encrypt
 
-## 💻 Getting Started (실행 방법)
+---
 
-1.  **Repository Clone**
+## 💻 Run Locally (로컬 실행 방법)
+
+1. 리포지토리를 클론합니다.
+   ```bash
+   git clone [https://github.com/your-username/BlazorRealtimeChat.git](https://github.com/your-username/BlazorRealtimeChat.git)
+
+2. 최상위 폴더에서 Docker Compose를 실행하여 DB와 서버를 띄웁니다.
     ```bash
-    git clone [https://github.com/ghsgkq/BlazorRealtimeChat.git](https://github.com/ghsgkq/BlazorRealtimeChat.git)
-    ```
-2.  **Database Setup (PostgreSQL)**
-    * `appsettings.json` 파일에서 `DefaultConnection` 문자열을 로컬 DB 정보에 맞게 수정합니다.
-    * 마이그레이션 적용 및 DB 생성:
-    ```bash
-    dotnet ef database update --project BlazorRealtimeChat/BlazorRealtimeChat
-    ```
-3.  **Run the Application**
-    * Visual Studio에서 `BlazorRealtimeChat` (Server 프로젝트)를 시작 프로젝트로 설정하고 실행하거나, 터미널에서 다음 명령어를 입력합니다.
-    ```bash
-    dotnet run --project BlazorRealtimeChat/BlazorRealtimeChat
+    docker compose up -d --build
     ```
 
-## 📸 Screenshots (스크린샷)
-
-*여기에 기능별 스크린샷을 3~4장 정도 추가하세요.*
-* `[스크린샷 1: 전체 채팅 화면 및 다크 테마 UI]`
-* `[스크린샷 2: 음성 통화 진행 중 (Speaking Indicator 표출)]`
-* `[스크린샷 3: 파일 업로드 진행률 바 및 이미지 확대 모달]`
-* `[스크린샷 4: 프로필 수정 모달]`
+3. 브라우저에서 `http://localhost:8080` 으로 접속합니다.
