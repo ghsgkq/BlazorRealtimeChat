@@ -46,17 +46,22 @@
         @if (selectedServer != null)
         {
             <div class="p-3 border-bottom border-secondary">
-                <h5 class="fw-bold mb-0">@selectedServer.ServerName</h5>
-                @* 현재 로그인한 사용자가 서버 주인인 경우에만 톱니바퀴 버튼 표시 *@
-                @if (selectedServer.OwnerId == currentUserId)
-                {
-                    @* <button class="btn btn-sm text-primary p-0 hover-light me-2" @onclick="GenerateInviteLink" title="사람 초대하기">
-                        <i class="bi bi-person-plus-fill fs-5"></i>
-                    </button> *@
-                    <button class="btn btn-sm text-secondary p-0 hover-light" @onclick="OpenServerSettings">
-                        <i class="bi bi-gear-fill"></i>
-                    </button>
-                }
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0 text-truncate">@selectedServer.ServerName</h5>
+                    
+                    <div class="d-flex gap-1 flex-shrink-0">
+                        @* 현재 로그인한 사용자가 서버 주인인 경우에만 버튼들 표시 *@
+                        @if (selectedServer.OwnerId == currentUserId)
+                        {
+                            <button class="btn btn-sm text-primary p-0 hover-light px-1" @onclick="GenerateInviteLink" title="사람 초대하기">
+                                <i class="bi bi-person-plus-fill fs-5"></i>
+                            </button>
+                            <button class="btn btn-sm text-secondary p-0 hover-light px-1" @onclick="OpenServerSettings">
+                                <i class="bi bi-gear-fill fs-5"></i>
+                            </button>
+                        }
+                    </div>
+                </div>
             </div>
             <div class="d-flex justify-content-between align-items-center p-3">
                 <span class="small text-uppercase">채널</span>
@@ -130,7 +135,6 @@
                     @* 텍스트 채널 그룹 *@
                     <div class="channel-group-header px-3 mt-3 d-flex justify-content-between align-items-center">
                         <span class="small text-uppercase fw-bold text-secondary" style="font-size: 0.7rem;">텍스트 채널</span>
-                        <button class="btn btn-sm text-secondary p-0" @onclick="ToggleAddChannelInput"><i class="bi bi-plus-lg"></i></button>
                     </div>
                     <ul class="list-unstyled p-2">
                         @foreach (var channel in channels.Where(c => c.Type == Shared.Enums.ChannelType.Text))
@@ -1234,41 +1238,34 @@
     }
 
     // 사용자 초대
-    @* private async Task GenerateInviteLink()
+    private async Task GenerateInviteLink()
     {
         if (selectedServer == null) return;
 
-        try
+        // NavigationManager.BaseUri 는 "http://localhost:8080/" 혹은 실제 도메인 주소를 반환합니다.
+        string baseUrl = NavigationManager.BaseUri;
+        string fullInviteUrl = $"{baseUrl}invite/{selectedServer.ServerId}";
+
+        // 1. InvokeVoidAsync 대신 InvokeAsync<JsonElement>를 사용하여 팝업창의 결과를 기다리고(await) 변수에 저장합니다.
+        var swalResult = await JSRuntime.InvokeAsync<JsonElement>("Swal.fire", new
         {
-            // 1. 서버(API)에 이 서버의 새로운 초대 코드(문자열)를 요청합니다.
-            // (이 부분은 ServerService에 함수를 나중에 추가해야 합니다)
-            string inviteCode = await ServerService.GenerateInviteCodeAsync(selectedServer.ServerId);
+            title = "서버 초대하기",
+            html = $"<div class='mb-2 text-muted small'>아래 링크를 복사해서 친구에게 보내주세요!</div>" +
+                   $"<input type='text' id='invite-link' class='form-control text-center mb-3 bg-light' value='{fullInviteUrl}' readonly>",
+            icon = "info",
+            confirmButtonText = "복사하기",
+            showCancelButton = true,
+            cancelButtonText = "닫기"
+        });
 
-            // 2. 현재 웹사이트의 주소를 가져와서 완성된 초대 URL을 만듭니다.
-            string baseUrl = NavigationManager.BaseUri;
-            string fullInviteUrl = $"{baseUrl}invite/{inviteCode}";
-
-            // 3. SweetAlert2를 이용해 사용자에게 링크를 보여주고 복사할 수 있게 합니다.
-            await JSRuntime.InvokeVoidAsync("Swal.fire", new
-            {
-                title = "서버 초대하기",
-                html = $"<p>아래 링크를 복사해서 친구에게 보내주세요!</p>" +
-                       $"<input type='text' id='invite-link' class='swal2-input' value='{fullInviteUrl}' readonly>",
-                icon = "info",
-                showCancelButton = true,
-                confirmButtonText = "복사하기",
-                cancelButtonText = "닫기",
-                preConfirm = new { /* JS로 복사 기능을 넣을 수 있습니다 */ }
-            });
-            
-            // (선택) JS를 통해 클립보드에 자동으로 복사하는 기능을 호출할 수도 있습니다.
+        // 2. ContinueWith를 쓰지 않고, 팝업이 닫힌 후 바로 여기서 결과를 확인합니다.
+        if (swalResult.TryGetProperty("isConfirmed", out var isConfirmed) && isConfirmed.GetBoolean())
+        {
+            // 클립보드에 복사하는 JS 실행
             await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", fullInviteUrl);
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "복사 완료!", "초대 링크가 클립보드에 복사되었습니다.", "success");
         }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "초대 링크를 생성하지 못했습니다.", "error");
-        }
-    } *@
+    }
 
     // 헬퍼 메서드들
     private double GetPeerVolume(string id) => userVolumes.GetValueOrDefault(id, 1.0);

@@ -17,7 +17,8 @@ public class ServerService(
         return servers.Select(server => new ServerDto()
         {
             ServerId = server.ServerId,
-            ServerName = server.ServerName
+            ServerName = server.ServerName,
+            OwnerId = server.OwnerId
         });
     }
 
@@ -57,5 +58,27 @@ public class ServerService(
             OwnerId = createdServer.OwnerId
 
         };
+    }
+
+    public async Task<bool> JoinServerAsync(Guid serverId, Guid userId)
+    {
+        // 1. 서버가 실제로 존재하는지 확인합니다.
+        var server = await serverRepository.GetServerByIdAsync(serverId);
+        if (server == null) return false;
+
+        // 2. 이미 가입된 멤버인지 확인합니다. (중복 에러 방지)
+        var isAlreadyMember = await serverMemberRepository.IsMemberAsync(serverId, userId);
+        if (isAlreadyMember) return true; // 이미 멤버라면 성공(true)으로 넘깁니다.
+
+        // 3. 서버 멤버 엔티티를 생성하고 저장합니다.
+        var newMember = new Data.Entity.ServerMember
+        {
+            ServerId = serverId,
+            UserId = userId
+        };
+        
+        await serverMemberRepository.AddServerMemberAsync(newMember);
+        
+        return true;
     }
 }

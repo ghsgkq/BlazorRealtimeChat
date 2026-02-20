@@ -23,4 +23,9 @@ public class ServerRepository(RealTimeChatContext context) : IServerRepository
         await context.SaveChangesAsync();
         return server;
     }
+
+    public async Task<Server?> GetServerByIdAsync(Guid serverId)
+    {
+        return await context.Servers.FirstOrDefaultAsync(s => s.ServerId == serverId);
+    }
 }
