@@ -8,7 +8,7 @@
 
 사용자 간의 실시간 텍스트 및 음성 통신을 지원하는 디스코드(Discord) 스타일의 웹 애플리케이션입니다. **Blazor WebAssembly**와 **ASP.NET Core SignalR**을 활용하여 빠르고 반응성 높은 SPA(Single Page Application)를 구축했으며, **WebRTC**를 통해 브라우저 간 P2P 음성 통화를 구현했습니다.
 
-[프로젝트 시연 영상 보러가기](유튜브 링크 또는 GIF 링크) ## 🚀 Key Features (핵심 기능)
+## 🚀 Key Features (핵심 기능)
 
 * **실시간 채팅 (SignalR)**
     * 새로고침 없이 즉각적으로 메시지를 주고받는 텍스트 채널.
@@ -61,7 +61,7 @@
 
 1.  **Repository Clone**
     ```bash
-    git clone [https://github.com/your-username/BlazorRealtimeChat.git](https://github.com/your-username/BlazorRealtimeChat.git)
+    git clone [https://github.com/ghsgkq/BlazorRealtimeChat.git](https://github.com/ghsgkq/BlazorRealtimeChat.git)
     ```
 2.  **Database Setup (PostgreSQL)**
     * `appsettings.json` 파일에서 `DefaultConnection` 문자열을 로컬 DB 정보에 맞게 수정합니다.

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: chat_db
+    environment:
+      POSTGRES_USER: chatuser
+      POSTGRES_PASSWORD: chatpassword
+      POSTGRES_DB: realtimechat
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat_web
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # appsettings.json을 덮어쓰는 환경변수 (db 컨테이너와 연결)
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=realtimechat;Username=chatuser;Password=chatpassword
+      # JWT 시크릿 키 (appsettings.json에 있는 이름과 동일하게 맞춰주세요)
+      - JwtSettings__SecretKey=0cab7ef2b6bbc5d10d58f49809db1202
+    ports:
+      - "8080:8080" # 외부 포트 8080 오픈
+    depends_on:
+      - db
+    restart: always
+
+volumes:
+  pgdata:
