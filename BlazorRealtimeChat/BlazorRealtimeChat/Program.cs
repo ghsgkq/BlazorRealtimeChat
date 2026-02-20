@@ -148,4 +148,10 @@ app.MapRazorComponents<App>()
 
 app.MapControllers();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<RealTimeChatContext>();
+    db.Database.Migrate(); // 앱 시작 시 자동으로 DB 테이블 생성
+}
+
 app.Run();
