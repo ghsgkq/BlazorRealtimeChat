@@ -384,7 +384,16 @@
             <div class="profile-content p-3">
                 @* 아바타 영역 (클릭 시 사진 변경) *@
                 <div class="avatar-edit-wrapper" @onclick="@(() => JSRuntime.InvokeVoidAsync("clickElement", "profileInput"))">
+                @if (!string.IsNullOrEmpty(currentProfileUrl))
+                {
                     <img src="@(string.IsNullOrEmpty(currentProfileUrl) ? "default-avatar.png" : currentProfileUrl)" class="profile-avatar-large" />
+                }
+                else
+                {
+                    <div class="bg-primary rounded-circle me-2 text-white fw-bold d-flex align-items-center justify-content-center profile-avatar-large" style="font-size: 25px;">
+                        @currentUsername?[0].ToString().ToUpper()
+                    </div>
+                }
                     <div class="avatar-hint"><i class="bi bi-camera-fill"></i></div>
                 </div>
                 <InputFile OnChange="HandleProfileImageUpload" id="profileInput" style="display:none;" />
@@ -404,9 +413,15 @@
                     </div>
                 }
 
-                <div class="d-flex justify-content-end gap-2 mt-3">
-                    <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="CloseProfileModal">취소</button>
-                    <button class="btn btn-sm btn-discord" @onclick="SaveProfileChanges">변경사항 저장하기</button>
+                <div class="d-flex justify-content-between align-items-center mt-4">
+                    <button class="btn btn-sm btn-outline-danger" @onclick="HandleLogout">
+                        <i class="bi bi-box-arrow-right me-1"></i> 로그아웃
+                    </button>
+                    
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="CloseProfileModal">취소</button>
+                        <button class="btn btn-sm btn-discord" @onclick="SaveProfileChanges">변경사항 저장</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1162,6 +1177,57 @@
     {
         // 서버 삭제나 이름 수정을 할 수 있는 모달을 띄우는 로직을 여기에 넣습니다.
         Console.WriteLine("서버 설정 모달 열기");
+    }
+
+    // 로그아웃
+    private async Task HandleLogout()
+    {
+        // 유저에게 정말 로그아웃할지 확인창 띄우기
+        var swalResult = await JSRuntime.InvokeAsync<JsonElement>("Swal.fire", new
+        {
+            title = "로그아웃",
+            text = "정말 로그아웃 하시겠습니까?",
+            icon = "warning",
+            showCancelButton = true,
+            confirmButtonColor = "#d33",
+            cancelButtonColor = "#3085d6",
+            confirmButtonText = "로그아웃",
+            cancelButtonText = "취소"
+        });
+
+        // 사용자가 '로그아웃' 버튼을 눌렀을 경우
+        if (swalResult.TryGetProperty("isConfirmed", out var isConfirmed) && isConfirmed.GetBoolean())
+        {
+            try
+            {
+                // 2. 음성 채널에 접속 중이라면 안전하게 끊고 나가기
+                if (selectedVoiceChannel != null && hubConnection != null)
+                {
+                    await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
+                    await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
+                }
+
+                // 3. 실시간 채팅(SignalR) 서버 연결 종료
+                if (hubConnection is not null)
+                {
+                    await hubConnection.StopAsync();
+                }
+
+                // 4. 로컬 스토리지에서 로그인 토큰 삭제
+                // (만약 AuthService.LogoutAsync() 메서드를 구현해두셨다면 그걸 호출하셔도 됩니다)
+                await LocalStorage.RemoveItemAsync("accessToken");
+
+                // 5. 로그인 페이지로 강제 이동 (true를 주면 페이지를 완전히 새로고침하여 메모리를 비웁니다)
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"로그아웃 처리 중 에러 발생: {ex.Message}");
+                // 에러가 나더라도 일단 강제로 로그인 창으로 보냅니다.
+                NavigationManager.NavigateTo("/login", forceLoad: true);
+            }
+        }
+        
     }
 
     // 헬퍼 메서드들

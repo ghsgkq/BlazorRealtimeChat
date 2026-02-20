@@ -58,3 +58,8 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* SweetAlert2 팝업창을 화면의 제일 앞(최상단)으로 가져옵니다. */
+.swal2-container {
+    z-index: 99999 !important; 
+}
