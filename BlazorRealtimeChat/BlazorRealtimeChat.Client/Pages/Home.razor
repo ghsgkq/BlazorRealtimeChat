@@ -677,7 +677,8 @@
         // 서버를 선택하면 첫 번째 채널을 자동으로 선택
         if (channels != null && channels.Any())
         {
-            await SelectChannel(channels.First());
+             // 첫 번쨰 텍스트 채널을 찾아서 선택합니다.
+            await SelectChannel(channels.FirstOrDefault(c => c.Type == Shared.Enums.ChannelType.Text) ?? channels.First());
         }
         else
         {
