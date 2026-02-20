@@ -1,38 +1,82 @@
 ﻿@page "/invite/{ServerId:guid}"
-@* 👇 1. WebAssembly 모드로 동작하도록 렌더링 모드를 지정합니다. *@
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
-@using BlazorRealtimeChat.Client.Layout
 
 @layout EmptyLayout
 
+@using BlazorRealtimeChat.Client.Layout
 @using BlazorRealtimeChat.Client.Services
+@using BlazorRealtimeChat.Shared.DTOs
 @using Microsoft.AspNetCore.Components.Authorization
 
-@* 👇 2. [Authorize] 태그는 삭제했습니다. *@
+
+
+@inject IJSRuntime JSRuntime
+
+
 @inject IServerService ServerService
 @inject NavigationManager NavigationManager
 
 <div class="d-flex vh-100 justify-content-center align-items-center bg-dark text-light">
-    <div class="text-center p-5 rounded" style="background-color: #36393f; max-width: 400px; width: 100%;">
-        @if (isProcessing)
+    <div class="text-center p-5 rounded shadow-lg" style="background-color: #36393f; max-width: 400px; width: 100%;">
+        
+        @if (isLoading)
         {
             <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
-            <h4 class="fw-bold">서버로 이동 중입니다...</h4>
-            <p class="text-white">잠시만 기다려 주세요.</p>
+            <h4 class="fw-bold">초대 정보 불러오는 중...</h4>
         }
-        else if (isSuccess)
+        else if (preview == null)
         {
+            <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 4rem;"></i>
+            <h4 class="fw-bold mt-3">서버를 찾을 수 없습니다</h4>
+            <p class="text-white">잘못된 링크이거나 삭제된 서버입니다.</p>
+            <button class="btn btn-primary mt-3 w-100" @onclick='() => NavigationManager.NavigateTo("/")'>홈으로 돌아가기</button>
+        }
+        else if (preview.IsAlreadyMember)
+        {
+            @* 💡 이미 가입된 사용자를 위한 화면 *@
+            <i class="bi bi-person-check-fill text-success" style="font-size: 4rem;"></i>
+            <h4 class="fw-bold mt-3">@preview.ServerName</h4>
+            <p class="text-white">이미 이 서버의 멤버입니다.</p>
+            <button class="btn btn-secondary mt-3 w-100" @onclick='() => NavigationManager.NavigateTo("/", forceLoad: true)'>채팅방으로 이동하기</button>
+        }
+        else if (isJoinSuccess)
+        {
+            @* 💡 참가를 성공했을 때의 화면 *@
             <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
             <h4 class="fw-bold mt-3">참가 완료!</h4>
-            <p class="text-white">채팅방으로 이동합니다.</p>
+            <p class="text-white">@preview.ServerName 서버로 이동합니다.</p>
         }
         else
         {
-            <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 4rem;"></i>
-            <h4 class="fw-bold mt-3">참가 실패</h4>
-            <p class="text-white">서버를 찾을 수 없거나 이미 가입된 서버입니다.</p>
-            <button class="btn btn-primary mt-3 w-100" @onclick='() => NavigationManager.NavigateTo("/")'>홈으로 돌아가기</button>
+            @* 💡 아직 가입하지 않은 사용자를 위한 [참가하기] 화면 *@
+            <div class="bg-primary rounded-circle mx-auto d-flex justify-content-center align-items-center mb-3" style="width: 80px; height: 80px;">
+                <span class="fs-1 fw-bold text-white">@preview.ServerName.Substring(0, 1)</span>
+            </div>
+            <p class="text-white mb-1">다음 서버로 초대받으셨습니다:</p>
+            <h3 class="fw-bold mb-4">@preview.ServerName</h3>
+            
+            @* 👇 버튼들을 위아래로 예쁘게 배치하고 간격을 줍니다. *@
+            <div class="d-flex flex-column gap-2 mt-4">
+                @* 1. 참가하기 버튼 *@
+                <button class="btn btn-discord w-100 py-2 fw-bold shadow-sm" @onclick="HandleJoinServer" disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>참가 처리 중...</span>
+                    }
+                    else
+                    {
+                        <span>참가하기</span>
+                    }
+                </button>
+                
+                @* 2. 취소 버튼 (btn-link 대신 btn-secondary 적용) *@
+                <button class="btn btn-secondary w-100 py-2 fw-bold shadow-sm" @onclick='() => NavigationManager.NavigateTo("/")'>
+                    취소
+                </button>
+            </div>
         }
+
     </div>
 </div>
 
@@ -40,47 +84,53 @@
     [Parameter]
     public Guid ServerId { get; set; }
 
-    // 👇 3. Home.razor처럼 로그인 상태를 가져오는 파라미터를 추가합니다.
     [CascadingParameter]
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
-    private bool isProcessing = true;
-    private bool isSuccess = false;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private bool isJoinSuccess = false;
+    
+    // API에서 받아올 서버 미리보기 데이터
+    private ServerPreviewDto? preview; 
 
     protected override async Task OnInitializedAsync()
     {
-        // 4. C# 로직 안에서 로그인 상태를 직접 검사합니다.
+        // 1. 로그인 상태 검사
         if (AuthenticationStateTask != null)
         {
             var authState = await AuthenticationStateTask;
             if (authState.User.Identity == null || !authState.User.Identity.IsAuthenticated)
             {
-                // 로그인이 안 되어있다면, 로그인 페이지로 강제로 돌려보냅니다!
                 NavigationManager.NavigateTo("/login", forceLoad: true);
                 return;
             }
         }
 
-        // 5. 로그인된 유저라면 백엔드 API에 가입 처리를 요청합니다.
-        try
-        {
-            isSuccess = await ServerService.JoinServerAsync(ServerId);
-            isProcessing = false;
-            StateHasChanged(); // 성공/실패 UI 렌더링
+        // 2. 페이지에 들어오자마자 가입하는 대신, "미리보기 정보"만 불러옵니다.
+        preview = await ServerService.GetServerPreviewAsync(ServerId);
+        isLoading = false;
+    }
 
-            if (isSuccess)
-            {
-                // 참가 성공 시 1.5초 뒤에 메인 화면(채팅방)으로 자연스럽게 이동시킵니다.
-                await Task.Delay(1500);
-                NavigationManager.NavigateTo("/", forceLoad: true); 
-            }
-        }
-        catch (Exception ex)
+    // [참가하기] 버튼을 눌렀을 때 실행되는 함수
+    private async Task HandleJoinServer()
+    {
+        isProcessing = true;
+        
+        // 3. 비로소 서버에 가입(Join) 요청을 보냅니다.
+        isJoinSuccess = await ServerService.JoinServerAsync(ServerId);
+        
+        if (isJoinSuccess)
         {
-            Console.WriteLine($"초대 수락 에러: {ex.Message}");
+            StateHasChanged(); // 성공 화면 렌더링
+            await Task.Delay(1500); // 1.5초 대기
+            NavigationManager.NavigateTo("/", forceLoad: true); // 메인으로 이동
+        }
+        else
+        {
+            // 만약 서버 에러로 가입에 실패했다면
             isProcessing = false;
-            isSuccess = false;
-            StateHasChanged();
+            await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "참가에 실패했습니다.", "error");
         }
     }
 }

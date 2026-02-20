@@ -186,18 +186,7 @@
     color: #4e5058;
 }
 
-/* 디스코드 블루 버튼 */
-.btn-discord {
-    background-color: #5865f2;
-    color: white;
-    font-weight: 500;
-    padding: 6px 20px;
-}
 
-.btn-discord:hover {
-    background-color: #4752c4;
-    color: white;
-}
 
 .channel-item.selected {
     background-color: var(--bs-secondary); /* Bootstrap의 secondary 색상을 사용 */

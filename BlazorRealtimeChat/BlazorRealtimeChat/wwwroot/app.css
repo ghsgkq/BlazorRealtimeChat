@@ -63,3 +63,16 @@ h1:focus {
 .swal2-container {
     z-index: 99999 !important; 
 }
+
+/* 디스코드 블루 버튼 */
+.btn-discord {
+    background-color: #5865f2;
+    color: white;
+    font-weight: 500;
+    padding: 6px 20px;
+}
+
+.btn-discord:hover {
+    background-color: #4752c4;
+    color: white;
+}

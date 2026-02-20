@@ -8,4 +8,5 @@ public interface IServerService
     Task<ServerDto> CreateServerAsync(CreateServerDto createServerDto);
 
     Task<bool> JoinServerAsync(Guid serverId);
+    Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId);
 }

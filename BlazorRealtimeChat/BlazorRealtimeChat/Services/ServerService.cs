@@ -81,4 +81,22 @@ public class ServerService(
         
         return true;
     }
+
+    public async Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId, Guid userId)
+    {
+        // 1. 서버 정보 가져오기
+        var server = await serverRepository.GetServerByIdAsync(serverId);
+        if (server == null) return null;
+
+        // 2. 이 유저가 이미 가입했는지 확인
+        var isMember = await serverMemberRepository.IsMemberAsync(serverId, userId);
+
+        // 3. 미리보기 정보 반환
+        return new ServerPreviewDto
+        {
+            ServerId = server.ServerId,
+            ServerName = server.ServerName,
+            IsAlreadyMember = isMember
+        };
+    }
 }

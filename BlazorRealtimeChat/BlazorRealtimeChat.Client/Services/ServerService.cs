@@ -32,4 +32,16 @@ public class ServerService : IServerService
         // 성공(200 OK)했다면 true 반환, 아니면 false 반환
         return response.IsSuccessStatusCode;
     }
+
+    public async Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<ServerPreviewDto>($"api/servers/{serverId}/preview");
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

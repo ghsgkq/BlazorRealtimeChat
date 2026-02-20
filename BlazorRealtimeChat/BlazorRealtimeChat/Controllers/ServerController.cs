@@ -52,4 +52,20 @@ public class ServerController(IServerService serverService) : Controller
             return BadRequest("서버를 찾을 수 없거나 참가에 실패했습니다.");
         }
     }
+
+    [HttpGet("{serverId}/preview")]
+    public async Task<IActionResult> GetServerPreview(Guid serverId)
+    {
+        var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
+        {
+            return Unauthorized("인증되지 않은 사용자입니다.");
+        }
+
+        var preview = await serverService.GetServerPreviewAsync(serverId, userId);
+        
+        if (preview == null) return NotFound("서버를 찾을 수 없습니다.");
+
+        return Ok(preview);
+    }
 }
