@@ -30,6 +30,8 @@ services:
     depends_on:
       - db
     restart: always
+    volumes:
+      - chat_uploads:/app/wwwroot/uploads
 
 volumes:
   pgdata:
