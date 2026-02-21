@@ -76,3 +76,31 @@ h1:focus {
     background-color: #4752c4;
     color: white;
 }
+
+/* --- 커스텀 디스코드 스타일 버튼 --- */
+.btn-discord {
+    background-color: #5865F2; /* 디스코드 특유의 블루퍼플 색상 */
+    color: white !important;
+    border: none;
+    border-radius: 4px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+/* 마우스를 올렸을 때 (Hover) 색상이 살짝 진해집니다 */
+.btn-discord:hover {
+    background-color: #4752C4;
+    color: white;
+}
+
+/* 버튼을 클릭할 때 (Active) 살짝 눌리는 애니메이션 효과를 줍니다 */
+.btn-discord:active {
+    transform: scale(0.98); 
+}
+
+/* 처리 중일 때 (Disabled) 버튼을 약간 투명하게 만듭니다 */
+.btn-discord:disabled {
+    background-color: #5865F2;
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}

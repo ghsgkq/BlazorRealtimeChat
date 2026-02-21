@@ -1,7 +1,15 @@
 ﻿let localStream;
 const peerConnections = {};
-const iceCandidatesQueue = {}; // [추가] PC가 생성되기 전 도착한 후보들을 저장
+const iceCandidatesQueue = {}; // PC가 생성되기 전 도착한 후보들을 저장
 let dotNetHelper;
+
+
+// 👇 [수정 1] 전역 변수들을 명확하게 선언해 줍니다.
+var audioContext;
+let microphone;
+let analyser;
+let speakingCheckInterval;
+let isCurrentlySpeaking = false;
 
 window.webrtcFunctions = {
 
@@ -34,6 +42,19 @@ window.webrtcFunctions = {
     startLocalStream: async (helper) => {
         dotNetHelper = helper;
         try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+                console.log("🔊 AudioContext 미리 기상 완료!");
+            }
+        } catch (e) {
+            console.warn("AudioContext 초기화 에러 (무시 가능):", e);
+        }
+
+        try {
+            // 이 코드에서 마이크 권한을 물어보며 멈춰있게 됩니다.
             localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             console.log("✅ 마이크 접근 성공");
             return true;
@@ -110,9 +131,10 @@ window.webrtcFunctions = {
     setupAudioAnalysis: async () => {
         if (!localStream) return;
 
-        // 오디오 컨텍스트 생성 ( 브라우저 호완성 처리 )
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioContext = new AudioContext();
+        // 이미 startLocalStream에서 엔진을 깨웠으므로 resume() 코드는 삭제했습니다.
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
 
         // 마이크 스트림을 소스로 연결
         microphone = audioContext.createMediaStreamSource(localStream);
