@@ -124,7 +124,7 @@ public class ServerService(
         var server = await serverRepository.GetServerByIdAsync(serverId);
         if (server == null) return null;
 
-        // 2. 💡 핵심 보안: 요청한 사람이 서버 방장(Owner)인지 확인합니다.
+        // 2. 핵심 보안: 요청한 사람이 서버 방장(Owner)인지 확인합니다.
         if (server.OwnerId != userId)
         {
             throw new UnauthorizedAccessException("서버 방장만 설정을 변경할 수 있습니다.");
@@ -138,6 +138,27 @@ public class ServerService(
         
         if (updateDto.ProfileImageUrl != null)
         {
+            // 기존 이미지가 존재하고, 새로 바꿀 이미지와 주소가 다를 때만 삭제 진행
+            if (!string.IsNullOrEmpty(server.ProfileImageUrl) && server.ProfileImageUrl != updateDto.ProfileImageUrl)
+            {
+                try
+                {
+                    var oldFileName = Path.GetFileName(server.ProfileImageUrl);
+                    var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "ExternalUploads", oldFileName);
+
+                    if (System.IO.File.Exists(oldFilePath))
+                    {
+                        System.IO.File.Delete(oldFilePath);
+                        Console.WriteLine($"[System] 기존 서버 프로필 교체로 인한 삭제 완료: {oldFileName}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Error] 기존 서버 프로필 이미지 삭제 실패: {ex.Message}");
+                }
+            }
+
+            // 삭제 시도를 마친 후, 새로운 이미지 URL로 덮어씌웁니다.
             server.ProfileImageUrl = updateDto.ProfileImageUrl;
         }
 

@@ -69,6 +69,26 @@ public class UserService(IUserRepository userRepository) : IUserService
         {
             return (false, "User not found.");
         }
+
+        if (!string.IsNullOrEmpty(user.ProfileImageUrl) && user.ProfileImageUrl != imageUrl)
+        {
+            try
+            {
+                var oldFileName = Path.GetFileName(user.ProfileImageUrl);
+                var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "ExternalUploads", oldFileName);
+
+                if (System.IO.File.Exists(oldFilePath))
+                {
+                    System.IO.File.Delete(oldFilePath);
+                    Console.WriteLine($"[System] 기존 유저 프로필 교체로 인한 삭제 완료: {oldFileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Error] 기존 유저 프로필 이미지 삭제 실패: {ex.Message}");
+            }
+        }
+
         user.ProfileImageUrl = imageUrl;
         await userRepository.UpdateProfileImgeAsync(id, imageUrl);
         return (true, "");
