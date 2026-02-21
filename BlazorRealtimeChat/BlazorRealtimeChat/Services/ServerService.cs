@@ -18,7 +18,8 @@ public class ServerService(
         {
             ServerId = server.ServerId,
             ServerName = server.ServerName,
-            OwnerId = server.OwnerId
+            OwnerId = server.OwnerId,
+            ProfileImageUrl = server.ProfileImageUrl
         });
     }
 
