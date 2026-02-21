@@ -8,4 +8,6 @@ public interface IServerMemberRepository
     Task AddServerMemberAsync(ServerMember serverMember);
 
     Task<bool> IsMemberAsync(Guid serverId, Guid userId);
+
+    Task<IEnumerable<User>> GetMembersByServerIdAsync(Guid serverId);
 }

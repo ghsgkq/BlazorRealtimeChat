@@ -44,4 +44,18 @@ public class ServerService : IServerService
             return null;
         }
     }
+
+    public async Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId)
+    {
+        try
+        {
+            var members = await _httpClient.GetFromJsonAsync<IEnumerable<ServerMemberDto>>($"api/servers/{serverId}/members");
+            return members ?? new List<ServerMemberDto>();
+        }
+        catch
+        {
+            return new List<ServerMemberDto>();
+        }
+    }
+
 }

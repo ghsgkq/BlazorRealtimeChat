@@ -19,4 +19,14 @@ public class ServerMemberRepository(RealTimeChatContext context) : IServerMember
         return await context.ServerMembers
             .AnyAsync(sm => sm.ServerId == serverId && sm.UserId == userId);
     }
+    
+    public async Task<IEnumerable<User>> GetMembersByServerIdAsync(Guid serverId)
+    {
+        // ServerMembers 테이블에서 ServerId가 일치하는 유저 정보(User)만 쏙 뽑아옵니다.
+        return await context.ServerMembers
+            .Where(sm => sm.ServerId == serverId)
+            .Include(sm => sm.User) 
+            .Select(sm => sm.User)
+            .ToListAsync();
+    }
 }

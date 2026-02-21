@@ -9,4 +9,6 @@ public interface IServerService
 
     Task<bool> JoinServerAsync(Guid serverId);
     Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId);
+
+    Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId);
 }

@@ -8,4 +8,6 @@ public interface IServerService
     Task<ServerDto> AddServerAsync(CreateServerDto createServerDto, Guid ownerId);
     Task<bool> JoinServerAsync(Guid serverId, Guid userId);   
     Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId, Guid userId);
+
+    Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId);
 }

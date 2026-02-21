@@ -15,6 +15,47 @@ namespace BlazorRealtimeChat.Hubs
         // {채널ID, 유저리스트} 형태의 정적 저장소
         private static readonly ConcurrentDictionary<string, List<VoiceUserDto>> VoiceUsers = new();
 
+        // 접속한 유저를 추적하기 위한 전역 메모리 
+        public static readonly ConcurrentDictionary<string, string> OnlineUsers = new();
+
+
+          // --- 클라이언트 접속 시 온라인 처리 ---
+        public override async Task OnConnectedAsync()
+        {
+            var userId = Context.UserIdentifier;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                // 유저가 접속하면 딕셔너리에 추가하고, 모두에게 "이 유저 온라인!" 이라고 알립니다.
+                OnlineUsers.TryAdd(Context.ConnectionId, userId);
+                await Clients.All.SendAsync("UserOnline", userId);
+            }
+            
+            await base.OnConnectedAsync();
+        }
+
+        // 연결이 끊어지면 실행 (새로고침, 브라우저 닫기 대응)
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            // 1. 기존 WebRTC 정리 로직
+            await CleanupUserFromAllGroups();
+
+            // 2. 온라인 상태 관리 로직
+            if (OnlineUsers.TryRemove(Context.ConnectionId, out var userId))
+            {
+                // 같은 유저가 다른 탭(기기)으로 접속 중인지 확인합니다.
+                bool isStillOnline = OnlineUsers.Values.Contains(userId);
+                
+                // 완전히 접속이 끊겼다면 모두에게 "이 유저 오프라인!" 이라고 알립니다.
+                if (!isStillOnline)
+                {
+                    await Clients.All.SendAsync("UserOffline", userId);
+                }
+            }
+
+            await base.OnDisconnectedAsync(exception);
+        }
+        
+
         // 클라이언트가 채널에 참여하기 위해 호출하는 메소드
         public async Task JoinChannel(string channelId)
         {
@@ -177,13 +218,6 @@ namespace BlazorRealtimeChat.Hubs
             }
         }
 
-        // 연결이 끊어지면 실행 (새로고침, 브라우저 닫기 대응)
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            await CleanupUserFromAllGroups();
-            await base.OnDisconnectedAsync(exception);
-        }
-
         private async Task BroadcastVoiceUpdate(string channelId)
         {
             if (VoiceUsers.TryGetValue(channelId, out var users))
@@ -211,5 +245,7 @@ namespace BlazorRealtimeChat.Hubs
 
 
         //-- WebRTC 관련 메서드 --//
+
+
     }
 }

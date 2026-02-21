@@ -99,4 +99,22 @@ public class ServerService(
             IsAlreadyMember = isMember
         };
     }
+
+    public async Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId)
+    {
+        var members = await serverMemberRepository.GetMembersByServerIdAsync(serverId);
+        
+        // 현재 ChatHub에 접속 중인 유저 ID 목록을 가져옵니다.
+        var onlineUserIds = Hubs.ChatHub.OnlineUsers.Values.ToHashSet();
+
+        return members.Select(user => new ServerMemberDto
+        {
+            UserId = user.Id,
+            UserName = user.UserName,
+            ProfileImageUrl = user.ProfileImageUrl,
+            // 💡 교집합 확인: 온라인 유저 목록에 이 사람의 ID가 있으면 true!
+            IsOnline = onlineUserIds.Contains(user.Id.ToString())
+        }).OrderByDescending(m => m.IsOnline).ThenBy(m => m.UserName).ToList(); 
+        // (온라인 유저를 위로, 그다음 이름순 정렬)
+    }
 }

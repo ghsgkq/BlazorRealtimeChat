@@ -68,4 +68,11 @@ public class ServerController(IServerService serverService) : Controller
 
         return Ok(preview);
     }
+    
+    [HttpGet("{serverId}/members")]
+    public async Task<IActionResult> GetServerMembers(Guid serverId)
+    {
+        var members = await serverService.GetServerMembersAsync(serverId);
+        return Ok(members);
+    }
 }

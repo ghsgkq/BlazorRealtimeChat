@@ -45,6 +45,9 @@
     <div class="channel-sidebar bg-dark text-light flex-shrink-0" style="display: flex; flex-direction: column;">
         @if (selectedServer != null)
         {
+            
+
+
             <div class="p-3 border-bottom border-secondary">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="fw-bold mb-0 text-truncate">@selectedServer.ServerName</h5>
@@ -379,6 +382,60 @@
             </div>
         }
     </div>
+    @if (selectedServer != null)
+    {
+        <div class="member-sidebar bg-dark text-light p-3 flex-shrink-0" style="width: 240px; overflow-y: auto; background-color: #2b2d31 !important;">
+            
+            @* --- 🟢 온라인 유저 그룹 --- *@
+            <h6 class="text-uppercase fw-bold mb-3" style="font-size: 0.75rem; color: #949ba4;">
+                온라인 — @serverMembers.Count(m => m.IsOnline)
+            </h6>
+            @foreach (var member in serverMembers.Where(m => m.IsOnline))
+            {
+                <div class="d-flex align-items-center mb-2 member-item p-2 rounded">
+                    <div class="position-relative me-3">
+                        @if (!string.IsNullOrEmpty(member.ProfileImageUrl))
+                        {
+                            <img src="@member.ProfileImageUrl" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;" />
+                        }
+                        else
+                        {
+                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                                @member.UserName.Substring(0, 1).ToUpper()
+                            </div>
+                        }
+                        @* 초록색 상태 표시등 *@
+                        <div class="position-absolute bottom-0 end-0 bg-success rounded-circle" style="width: 12px; height: 12px; border: 2.5px solid #2b2d31;"></div>
+                    </div>
+                    <span class="text-light fw-bold text-truncate" style="font-size: 0.95rem;">@member.UserName</span>
+                </div>
+            }
+
+            @* --- ⚪ 오프라인 유저 그룹 --- *@
+            <h6 class="text-uppercase fw-bold mt-4 mb-3" style="font-size: 0.75rem; color: #949ba4;">
+                오프라인 — @serverMembers.Count(m => !m.IsOnline)
+            </h6>
+            @foreach (var member in serverMembers.Where(m => !m.IsOnline))
+            {
+                <div class="d-flex align-items-center mb-2 member-item p-2 rounded" style="opacity: 0.4;">
+                    <div class="position-relative me-3">
+                        @if (!string.IsNullOrEmpty(member.ProfileImageUrl))
+                        {
+                            <img src="@member.ProfileImageUrl" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover; filter: grayscale(100%);" />
+                        }
+                        else
+                        {
+                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                                @member.UserName.Substring(0, 1).ToUpper()
+                            </div>
+                        }
+                    </div>
+                    <span class="text-light fw-bold text-truncate" style="font-size: 0.95rem;">@member.UserName</span>
+                </div>
+            }
+        </div>
+    }
+
 </div>
 
 @if (isProfileModalOpen)
@@ -496,6 +553,9 @@
     private bool isProfileUpdateSuccess = false;
     private string? profileUpdateMessage;
 
+    // 서버 맴버 목록
+    private List<ServerMemberDto> serverMembers = new();
+
     
 
     // 모달 열기/닫기 메서드
@@ -607,6 +667,29 @@
             StateHasChanged(); // UI 갱신
         });
 
+        // 다른 유저가 접속(온라인)했을 때
+        hubConnection.On<string>("UserOnline", async (userId) =>
+        {
+            var member = serverMembers.FirstOrDefault(m => m.UserId.ToString() == userId);
+            if (member != null && !member.IsOnline)
+            {
+                member.IsOnline = true; // 온라인 상태로 변경
+                await InvokeAsync(StateHasChanged); // 즉시 화면 갱신
+            }
+        });
+
+        // 다른 유저가 나갔을(오프라인) 때
+        hubConnection.On<string>("UserOffline", async (userId) =>
+        {
+            var member = serverMembers.FirstOrDefault(m => m.UserId.ToString() == userId);
+            if (member != null && member.IsOnline)
+            {
+                member.IsOnline = false; // 오프라인 상태로 변경
+                await InvokeAsync(StateHasChanged); // 즉시 화면 갱신
+            }
+        });
+
+
         try
         {
             // 2. 서버와 연결 시작
@@ -691,19 +774,22 @@
         }
     }
 
-    // 2. 서버 선택 시 실행되는 메인 함수
+    // 서버 선택 시 실행되는 메인 함수
     private async Task SelectServer(ServerDto server)
     {
-        // 가. 이전 서버 연결 상태 및 UI 초기화
+        // 이전 서버 연결 상태 및 UI 초기화
         selectedServer = server;
         selectedTextChannel = null; 
         selectedVoiceChannel = null;
         chatMessages.Clear();
 
-        // 나. 선택된 서버의 채널 목록 불러오기 (우리가 방금 만든 함수 호출!)
+        var members = await ServerService.GetServerMembersAsync(server.ServerId);
+        serverMembers = members.ToList();
+    
+        // 선택된 서버의 채널 목록 불러오기 (우리가 방금 만든 함수 호출!)
         await LoadChannels(server);
 
-        // 다. 채널 로딩이 끝난 후, 첫 번째 텍스트 채널을 찾아서 자동으로 입장합니다.
+        // 채널 로딩이 끝난 후, 첫 번째 텍스트 채널을 찾아서 자동으로 입장합니다.
         if (channels != null && channels.Any())
         {
             var firstTextChannel = channels.FirstOrDefault(c => c.Type == Shared.Enums.ChannelType.Text) ?? channels.First();
