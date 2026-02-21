@@ -170,10 +170,10 @@
                             </li>
 
                             @* 해당 채널에 유저가 있을 때만 목록 표시 *@
-                            @if (voiceRoomUsers.TryGetValue(channel.ChannelId.ToString(), out var users) && users.Any())
+                            @if (voiceRoomUsers.TryGetValue(channel.ChannelId.ToString(), out var channelUsers) && channelUsers.Any())
                             {
                                 <div class="ms-4 mb-2">
-                                    @foreach (var user in users)
+                                    @foreach (var user in channelUsers)
                                     {
                                         @* 1. 유저 아이템 (클릭 가능 영역) *@
                                         @* 메뉴가 열린 상태면 active 클래스 추가 *@
@@ -245,17 +245,23 @@
         {
             <div class="voice-connection-panel p-2 bg-dark border-top border-secondary">
                 <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
+                    @* 👇 영역에 마우스를 올리면 손가락 모양이 되게 하고, 클릭하면 갤러리 뷰로 전환합니다. *@
+                    <div class="flex-grow-1 hover-light p-1 rounded" style="cursor: pointer;" @onclick='() => { currentMainView = "voice"; }'>
                         <div class="text-success small fw-bold"><i class="bi bi-broadcast me-1"></i> 음성 연결됨</div>
-                        <div class="text-muted" style="font-size: 0.75rem;">@selectedVoiceChannel.ChannelName</div>
+                        <div class="text-muted text-truncate" style="font-size: 0.75rem;">@selectedVoiceChannel.ChannelName</div>
                     </div>
                     <div class="d-flex gap-2">
-                        @* 내 마이크 끄기/켜기 *@
+                        @* 👇 화면 공유 토글 버튼 *@
+                        <button class="btn btn-sm @(isScreenSharing ? "btn-success" : "btn-outline-info") border-0"
+                                @onclick="ToggleScreenShare" title="화면 공유">
+                            <i class="bi @(isScreenSharing ? "bi-display-fill" : "bi-display")"></i>
+                        </button>
+
+                        @* 기존 마이크/종료 버튼 유지 *@
                         <button class="btn btn-sm @(isLocalMicMuted ? "btn-danger" : "btn-outline-light") border-0"
                                 @onclick="ToggleLocalMic">
                             <i class="bi @(isLocalMicMuted ? "bi-mic-mute-fill" : "bi-mic-fill")"></i>
                         </button>
-
                         <button class="btn btn-sm btn-outline-danger border-0" @onclick="LeaveVoiceChannel">
                             <i class="bi bi-telephone-x-fill"></i>
                         </button>
@@ -286,92 +292,171 @@
     </div>
 
     <!-- 3. 메인 콘텐츠 (채팅창) -->
-    <div class="main-content d-flex flex-column flex-grow-1">
-        <div class="chat-messages flex-grow-1 p-3" @ref="chatMessagesBox" style="overflow-y: auto;">
-            @foreach (var msg in chatMessages)
+    <div class="main-content position-relative d-flex flex-column flex-grow-1" style="background-color: #313338; height: 100vh; overflow: hidden;">
+        
+        @* ========================================= *@
+        @* 뷰 1: 음성 갤러리 (currentMainView == "voice") *@
+        @* ========================================= *@
+        <div class="voice-gallery-container flex-wrap gap-3 justify-content-center p-4" 
+             style="display: @(currentMainView == "voice" && selectedVoiceChannel != null ? "flex" : "none") !important; background-color: #000000; flex-grow: 1; height: 100%; overflow-y: auto; align-items: center;">
+            
+            @* 1. 내 카드 (로컬 화면) *@
+            @* 👇 [수정됨] 카드 스타일: 고정 크기 제거, flex 유동 크기 및 aspect-ratio 적용 *@
+            <div class="voice-user-card position-relative rounded shadow-sm d-flex flex-column align-items-center justify-content-center" 
+                 style="flex: 1 1 400px; aspect-ratio: 16 / 9; min-width: 300px; max-width: 100%; max-height: calc(100vh - 150px); background-color: #1e1f22; border: 3px solid @(IsSpeaking(hubConnection?.ConnectionId ?? "") ? "#23a559" : "transparent"); overflow: hidden; transition: border-color 0.15s ease;">
+                
+                <video id="local-video" @onclick='() => ToggleFullscreen("local-video")' title="클릭하여 전체화면" 
+                           autoplay muted playsinline 
+                           style="cursor: pointer; display: @(isScreenSharing ? "block" : "none"); width: 100%; height: 100%; object-fit: contain; background: #000;">
+                </video>
+                
+                @if (!isScreenSharing)
+                {
+                    @if (!string.IsNullOrEmpty(currentProfileUrl))
+                    {
+                        <img src="@currentProfileUrl" class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;" />
+                    }
+                    else
+                    {
+                        <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 80px; height: 80px; font-size: 2rem;">
+                            @currentUsername?.Substring(0, 1).ToUpper()
+                        </div>
+                    }
+                }
+                
+                <div class="position-absolute bottom-0 start-0 w-100 p-3 d-flex align-items-center justify-content-between" style="background: linear-gradient(transparent, rgba(0,0,0,0.8));">
+                    <span class="text-white fw-bold text-truncate me-2" style="font-size: 1.1rem;">@currentUsername</span>
+                    @if (isScreenSharing)
+                    {
+                        <span class="badge bg-danger rounded-pill" style="font-size: 0.75rem; padding: 0.4em 0.7em;"><i class="bi bi-display me-1"></i>방송 중</span>
+                    }
+                </div>
+            </div>
+
+            @* 2. 상대방 카드들 *@
+            @if (selectedVoiceChannel != null && voiceRoomUsers.TryGetValue(selectedVoiceChannel.ChannelId.ToString(), out var galleryUsers))
             {
-                <div class="d-flex mb-3 message-item">
-                    @* 아바타 *@
-                    <div class="flex-shrink-0">
-                        @if (!string.IsNullOrEmpty(msg.ProfileImageUrl))
+                @foreach (var user in galleryUsers.Where(u => u.ConnectionId != hubConnection?.ConnectionId))
+                {
+                    bool isUserSharing = IsUserScreenSharing(user.ConnectionId);
+
+                    @* 👇 [수정됨] 상대방 카드 스타일도 동일하게 적용 *@
+                    <div class="voice-user-card position-relative rounded shadow-sm d-flex flex-column align-items-center justify-content-center" 
+                         style="flex: 1 1 400px; aspect-ratio: 16 / 9; min-width: 300px; max-width: 100%; max-height: calc(100vh - 150px); background-color: #1e1f22; border: 3px solid @(IsSpeaking(user.ConnectionId) ? "#23a559" : "transparent"); overflow: hidden; transition: border-color 0.15s ease;">
+                        
+                        @* object-fit: cover를 contain으로 변경하여 화면이 잘리지 않게 함 *@
+                        <video id="video-@user.ConnectionId" @onclick='() => ToggleFullscreen($"video-{user.ConnectionId}")' title="클릭하여 전체화면" 
+                                   autoplay playsinline 
+                                   style="cursor: pointer; display: @(isUserSharing ? "block" : "none"); width: 100%; height: 100%; object-fit: contain; background: #000;">
+                        </video>
+                        
+                        @if (!isUserSharing)
                         {
-                            <img src="@msg.ProfileImageUrl" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;" />
-                        }
-                        else
-                        {
-                            <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 40px; height: 40px;">
-                                @msg.UserName?[0].ToString().ToUpper()
+                            <div id="avatar-@user.ConnectionId" class="d-flex flex-column align-items-center">
+                                @if (!string.IsNullOrEmpty(user.ProfileImageUrl))
+                                {
+                                    <img src="@user.ProfileImageUrl" class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;" />
+                                }
+                                else
+                                {
+                                    <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 80px; height: 80px; font-size: 2rem;">
+                                        @user.UserName.Substring(0, 1).ToUpper()
+                                    </div>
+                                }
                             </div>
                         }
-                    </div>
 
-                    @* 콘텐츠 *@
-                    <div class="flex-grow-1 ms-3">
-                        <div class="d-flex align-items-center mb-1">
-                            <span class="fw-bold me-2" style="color: #00d1b2;">@msg.UserName</span>
-                            <span class="" style="font-size: 0.75rem;">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
+                        <audio id="audio-@user.ConnectionId" autoplay></audio>
+
+                        <div class="position-absolute bottom-0 start-0 w-100 p-3 d-flex align-items-center justify-content-between" style="background: linear-gradient(transparent, rgba(0,0,0,0.8));">
+                            <span class="text-white fw-bold text-truncate me-2" style="font-size: 1.1rem;">@user.UserName</span>
+                            @if (isUserSharing)
+                            {
+                                <span id="badge-@user.ConnectionId" class="badge bg-danger rounded-pill" style="font-size: 0.75rem; padding: 0.4em 0.7em;"><i class="bi bi-display me-1"></i>방송 중</span>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+        @* ========================================= *@
+        @* 뷰 2: 텍스트 채팅창 (currentMainView == "text") *@
+        @* ========================================= *@
+        <div class="text-chat-container flex-column flex-grow-1" 
+             style="display: @(currentMainView == "text" && selectedTextChannel != null ? "flex" : "none") !important; height: 100%; overflow: hidden;">
+             
+            <div class="chat-messages flex-grow-1 p-3" @ref="chatMessagesBox" style="overflow-y: auto;">
+                @foreach (var msg in chatMessages)
+                {
+                    <div class="d-flex mb-3 message-item">
+                        @* 아바타 *@
+                        <div class="flex-shrink-0">
+                            @if (!string.IsNullOrEmpty(msg.ProfileImageUrl))
+                            {
+                                <img src="@msg.ProfileImageUrl" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;" />
+                            }
+                            else
+                            {
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" style="width: 40px; height: 40px;">
+                                    @msg.UserName?[0].ToString().ToUpper()
+                                </div>
+                            }
                         </div>
 
-                        @if (msg.MessageType == "text")
-                        {
-                            <div class="text-light">@msg.Content</div>
-                        }
-                        else if (msg.MessageType == "image")
-                        {
-                            <img src="@msg.FileUrl" @onclick="@(() => OpenMediaModal(msg.FileUrl, "image"))"
-                                 class="chat-media rounded mt-1 shadow-sm" style="max-width: 350px; cursor: pointer;" />
-                        }
-                        else if (msg.MessageType == "video")
-                        {
-                            <div class="mt-1">
-                                <video src="@msg.FileUrl"
-                                       controls
-                                       autoplay
-                                       muted
-                                       loop
-                                       class="chat-media rounded shadow-sm"
-                                       style="max-width: 350px; cursor: pointer;"
-                                       @onclick='() => OpenMediaModal(msg.FileUrl, "video")' />
+                        @* 콘텐츠 *@
+                        <div class="flex-grow-1 ms-3">
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="fw-bold me-2" style="color: #00d1b2;">@msg.UserName</span>
+                                <span class="text-muted" style="font-size: 0.75rem;">@msg.Timestamp.ToLocalTime().ToString("HH:mm")</span>
                             </div>
-                        }
-                        else
-                        {
-                            <a href="@msg.FileUrl" target="_blank" class="btn btn-sm btn-outline-info mt-1">📎 파일 다운로드</a>
-                        }
-                    </div>
-                </div>
-            }
-        </div>
-        <div class="chat-input p-3 bg-dark">
-            @if (isUploading)
-            {
-                <div class="upload-progress-container mb-2">
-                    <div class="d-flex justify-content-between mb-1">
-                        <span class="small text-light"><i class="bi bi-cloud-arrow-up me-1"></i> 파일 업로드 중...</span>
-                        <span class="small text-light">@uploadPercentage%</span>
-                    </div>
-                    <div class="progress" style="height: 4px; background-color: #404249;">
-                        <div class="progress-bar" role="progressbar"
-                             style="width: @(uploadPercentage)%; background-color: #5865f2; transition: width 0.1s;"></div>
-                    </div>
-                </div>
-            }
-            <div class="input-group">
-                @* 1. InputFile은 그대로 두되, ID를 확실히 지정합니다 *@
-                <InputFile OnChange="HandleFileSelected" id="fileInput" style="display:none;" />
 
-                @* 2. button 대신 label을 사용합니다. for="fileInput"이 핵심입니다! *@
-                @* 이 label을 클릭하면 브라우저가 알아서 ID가 fileInput인 요소를 클릭해줍니다. *@
-                <label for="fileInput" class="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center" style="cursor: pointer; width: 45px;">
-                    +
-                </label>
-
-                <input type="text" id="msgInput" class="form-control bg-dark text-light border-secondary"
-                       placeholder="@($"# {selectedTextChannel?.ChannelName ?? ""}에 메시지 보내기")"
-                       @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
+                            @if (msg.MessageType == "text")
+                            {
+                                <div class="text-light">@msg.Content</div>
+                            }
+                            else if (msg.MessageType == "image")
+                            {
+                                <img src="@msg.FileUrl" @onclick="@(() => OpenMediaModal(msg.FileUrl, "image"))"
+                                     class="chat-media rounded mt-1 shadow-sm" style="max-width: 350px; cursor: pointer;" />
+                            }
+                            else if (msg.MessageType == "video")
+                            {
+                                <div class="mt-1">
+                                    <video src="@msg.FileUrl" controls autoplay muted loop class="chat-media rounded shadow-sm" style="max-width: 350px; cursor: pointer;" @onclick='() => OpenMediaModal(msg.FileUrl, "video")' />
+                                </div>
+                            }
+                            else
+                            {
+                                <a href="@msg.FileUrl" target="_blank" class="btn btn-sm btn-outline-info mt-1">📎 파일 다운로드</a>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            
+            @* 채팅 입력창 *@
+            <div class="chat-input p-3 bg-dark">
+                @if (isUploading)
+                {
+                    <div class="upload-progress-container mb-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small text-light"><i class="bi bi-cloud-arrow-up me-1"></i> 파일 업로드 중...</span>
+                            <span class="small text-light">@uploadPercentage%</span>
+                        </div>
+                        <div class="progress" style="height: 4px; background-color: #404249;">
+                            <div class="progress-bar" role="progressbar" style="width: @(uploadPercentage)%; background-color: #5865f2; transition: width 0.1s;"></div>
+                        </div>
+                    </div>
+                }
+                <div class="input-group">
+                    <InputFile OnChange="HandleFileSelected" id="fileInput" style="display:none;" />
+                    <label for="fileInput" class="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center" style="cursor: pointer; width: 45px; border-color: #404249;">+</label>
+                    <input type="text" id="msgInput" class="form-control bg-dark text-light border-secondary" style="border-color: #404249 !important;" placeholder="@($"# {selectedTextChannel?.ChannelName ?? ""}에 메시지 보내기")" @bind="messageInput" @onkeyup="HandleChatInput" disabled="@(!isChatConnected)" />
+                </div>
             </div>
         </div>
-        @* --- 통합 미디어 모달 --- *@
+
         @if (isMediaModalOpen)
         {
             <div class="media-modal-backdrop" @onclick="CloseMediaModal">
@@ -382,7 +467,6 @@
                     }
                     else if (selectedMediaType == "video")
                     {
-                        @* 확대 모달에서는 소리가 나오도록 muted를 뺍니다 *@
                         <video src="@selectedMediaUrl" controls autoplay class="modal-media-element" />
                     }
                     <button class="modal-close-x" @onclick="CloseMediaModal">×</button>
@@ -626,6 +710,16 @@
     private string? serverSettingsUpdateMessage;
     private bool isServerSettingsUpdateSuccess = false;
     
+
+    // 화면 공유 상태 값
+    private bool isScreenSharing = false;
+    private Dictionary<string, bool> screenSharingStates = new();
+    
+    // 이 유저가 화면 공유 중인지 확인
+    private bool IsUserScreenSharing(string connectionId) => screenSharingStates.GetValueOrDefault(connectionId, false);
+
+    // 현재 화면 상태 ("text" 또는 "voice")
+    private string currentMainView = "text";
 
     // 모달 열기/닫기 메서드
     private void OpenMediaModal(string url, string type)
@@ -890,6 +984,7 @@
 
     private async Task JoinTextChannel(ChannelDto channel)
     {
+        currentMainView = "text";
         // 1. hubConnection이 생성되었고 연결된 상태인지 먼저 확인합니다.
         if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
         {
@@ -947,7 +1042,14 @@
     {
 
 
-        if (selectedVoiceChannel?.ChannelId == channel.ChannelId) return;
+        if (selectedVoiceChannel?.ChannelId == channel.ChannelId)
+        {
+            currentMainView = "voice";
+            StateHasChanged();
+            return;
+        }
+
+        currentMainView = "voice"; // 새 음성 채널 접속 시에도 'voice' 모드로 전환
 
         // 만약 이미 다른 음성 채널이 있다면, 리소스를 먼저 정리한다
         if (selectedVoiceChannel != null)
@@ -1243,19 +1345,47 @@
     }
 
 
-    private async void LeaveVoiceChannel()
+    // 👇 [수정 1] async void 대신 async Task로 변경하여 앱이 뻗는 것을 방지합니다!
+    private async Task LeaveVoiceChannel()
     {
         if (selectedVoiceChannel != null && hubConnection != null)
         {
-            // 분석 중지 및 상태 초기화
-            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopAudioAnalysis");
-            speakingStates.Clear(); // 상태 사전 초기화
+            // try-catch로 감싸서 혹시 통신 에러가 나도 앱이 죽지 않게 보호합니다.
+            try
+            {
+                // 1. 분석 중지
+                await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopAudioAnalysis");
+                
+                // 2. 상태 변수들 싹 초기화
+                isScreenSharing = false;   
+                speakingStates.Clear();    
+                screenSharingStates.Clear(); 
+                userVolumes.Clear();       
+                userMutes.Clear();
+                openMenuConnectionId = null; 
 
-            await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
-            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
-            selectedVoiceChannel = null;
+                // 3. 서버에 퇴장 알림 (연결되어 있을 때만)
+                if (hubConnection.State == HubConnectionState.Connected)
+                {
+                    await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
+                }
+                
+                // 4. JS에게 마이크/화면 스트림 끄기 명령
+                await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
+            }
+            catch (Exception ex)
+            {
+                // 에러가 나면 콘솔에만 찍고 넘어갑니다.
+                Console.WriteLine($"채널 퇴장 중 오류 발생: {ex.Message}");
+            }
+            finally
+            {
+                // 👇 [핵심] 에러가 나든 안 나든, 화면 상태는 무조건 텍스트 채팅으로 초기화합니다!
+                selectedVoiceChannel = null;
+                currentMainView = "text"; 
+                StateHasChanged();
+            }
         }
-        StateHasChanged();
     }
 
     // 상대방 볼륨 조절
@@ -1555,6 +1685,43 @@
             await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", fullInviteUrl);
             await JSRuntime.InvokeVoidAsync("Swal.fire", "복사 완료!", "초대 링크가 클립보드에 복사되었습니다.", "success");
         }
+    }
+
+    // 화면 공유 버튼 클릭 시 실행
+    private async Task ToggleScreenShare()
+    {
+        if (!isScreenSharing)
+        {
+            var success = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startScreenShare");
+            if (success) isScreenSharing = true;
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopScreenShare");
+            isScreenSharing = false;
+        }
+    }
+
+    // 브라우저 자체의 '공유 중지' 버튼을 눌렀을 때 C# 버튼 상태 동기화
+    [JSInvokable("OnScreenShareStopped")]
+    public void OnScreenShareStopped()
+    {
+        isScreenSharing = false;
+        StateHasChanged();
+    }
+
+    // JS에서 화면을 받거나 끊겼을 때 호출되는 메서드
+    [JSInvokable("SetUserScreenShareState")]
+    public async Task SetUserScreenShareState(string connectionId, bool isSharing)
+    {
+        screenSharingStates[connectionId] = isSharing;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // 비디오 클릭 시 전체화면 토글
+    private async Task ToggleFullscreen(string elementId)
+    {
+        await JSRuntime.InvokeVoidAsync("webrtcFunctions.toggleFullscreen", elementId);
     }
 
     // 헬퍼 메서드들

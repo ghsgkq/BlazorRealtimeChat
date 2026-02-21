@@ -11,6 +11,8 @@ let analyser;
 let speakingCheckInterval;
 let isCurrentlySpeaking = false;
 
+let localScreenStream; // 화면 공유 스트림 저장용
+
 window.webrtcFunctions = {
 
     // 1. 상대방의 볼륨 조절 (0.0 ~ 1.0)
@@ -109,22 +111,35 @@ window.webrtcFunctions = {
     },
 
     stopStream: () => {
-        console.log("🛑 WebRTC 모든 연결 및 트랙 종료");
-        // 모든 피어 연결 닫기
-        Object.keys(peerConnections).forEach(id => {
-            if (peerConnections[id]) {
-                peerConnections[id].close();
-                delete peerConnections[id];
-            }
-        });
-
-        // 로컬 마이크 트랙 정지
+        console.log("Stopping local stream...");
+        
+        // 1. 마이크 스트림 정지
         if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
             localStream = null;
         }
-        // ICE 후보 큐 비우기
-        Object.keys(iceCandidatesQueue).forEach(id => delete iceCandidatesQueue[id]);
+
+        // 👇 [추가됨] 2. 화면 공유 스트림도 있으면 정지!
+        if (localScreenStream) {
+            localScreenStream.getTracks().forEach(track => track.stop());
+            localScreenStream = null;
+            // C# 쪽에 꺼졌다고 알림
+            if (dotNetHelper) {
+                dotNetHelper.invokeMethodAsync("OnScreenShareStopped");
+            }
+        }
+
+        // 3. UI 초기화
+        const localVideo = document.getElementById("local-video");
+        if (localVideo) {
+             localVideo.srcObject = null;
+        }
+
+        // 4. 피어 연결 모두 종료
+        for (let id in peerConnections) {
+            peerConnections[id].close();
+        }
+        peerConnections = {};
     },
 
     // 오디오 분석 시작
@@ -177,11 +192,95 @@ window.webrtcFunctions = {
         audioContext = null;
         analyser = null;
         microphone = null;
+    },
+
+    // --- 화면 공유 시작 ---
+    startScreenShare: async () => {
+        try {
+            // 1. 브라우저에 화면 공유 권한을 요청합니다.
+            localScreenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            const screenTrack = localScreenStream.getVideoTracks()[0];
+
+            // 2. 브라우저 자체의 '공유 중지' 버튼을 눌렀을 때를 대비한 이벤트
+            screenTrack.onended = () => {
+                window.webrtcFunctions.stopScreenShare();
+            };
+
+            // 3. 내 화면을 내 UI에 보여줍니다. (블레이저 쪽에 만들 video 태그 ID)
+            const localVideo = document.getElementById("local-video");
+            if (localVideo) {
+                localVideo.srcObject = localScreenStream;
+                localVideo.style.display = "block";
+            }
+
+            // 4. 현재 연결된 모든 사람(PeerConnection)에게 내 화면 트랙을 추가합니다.
+            for (let id in peerConnections) {
+                const pc = peerConnections[id];
+                pc.addTrack(screenTrack, localScreenStream);
+            }
+            return true;
+        } catch (e) {
+            console.error("화면 공유 취소 또는 에러:", e);
+            return false;
+        }
+    },
+
+    // --- 화면 공유 중지 ---
+    stopScreenShare: async () => {
+        if (localScreenStream) {
+            // 1. 카메라/화면 트랙 끄기
+            localScreenStream.getTracks().forEach(track => track.stop());
+            localScreenStream = null;
+
+            // 2. 내 UI에서 비디오 숨기기
+            const localVideo = document.getElementById("local-video");
+            if (localVideo) {
+                localVideo.srcObject = null;
+                localVideo.style.display = "none";
+            }
+
+            // 3. 연결된 피어들에게서 비디오 트랙 제거
+            for (let id in peerConnections) {
+                const pc = peerConnections[id];
+                const senders = pc.getSenders();
+                // 비디오 트랙(화면)을 찾아서 제거
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                if (videoSender) {
+                    pc.removeTrack(videoSender);
+                }
+            }
+
+            // 4. C# 측에 화면 공유가 꺼졌음을 알림 (버튼 상태 동기화용)
+            if (dotNetHelper) {
+                dotNetHelper.invokeMethodAsync("OnScreenShareStopped");
+            }
+        }
+    },
+    //특정 비디오 요소를 전체화면으로 띄우거나 끄는 기능 
+    toggleFullscreen: (elementId) => {
+        const elem = document.getElementById(elementId);
+        if (elem) {
+            // 현재 전체화면 상태가 아니라면 전체화면 요청
+            if (!document.fullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => console.log(err));
+                } else if (elem.webkitRequestFullscreen) { /* 사파리 호환 */
+                    elem.webkitRequestFullscreen();
+                }
+            } else {
+                // 이미 전체화면이라면 원래대로 복귀
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) { /* 사파리 호환 */
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
     }
+
 };
 
 function createPeerConnection(targetId) {
-    console.log(`🔨 [PC 생성] ID: ${targetId}`); 
     const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
@@ -192,28 +291,56 @@ function createPeerConnection(targetId) {
         localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
     }
 
-    pc.ontrack = (event) => {
-        console.log(`🔊 [오디오 재생] 상대방(${targetId}) 스트림 수신됨!`);
-        let audio = document.getElementById(`audio-${targetId}`);
-        if (!audio) {
-            audio = document.createElement("audio");
-            audio.id = `audio-${targetId}`;
-            document.body.appendChild(audio);
+    // 👇 [추가] 트랙이 새로 추가되거나 삭제될 때 자동으로 재협상(Offer)을 보냅니다.
+    pc.onnegotiationneeded = async () => {
+        try {
+            // 연결 상태가 안정적일 때만 Offer를 생성해야 충돌이 안 납니다.
+            if (pc.signalingState !== "stable") return; 
+            
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await dotNetHelper.invokeMethodAsync('SendSignalToHex', targetId, JSON.stringify({ sdp: pc.localDescription }));
+        } catch (e) {
+            console.error("재협상 에러:", e);
         }
-        audio.srcObject = event.streams[0];
-        audio.autoplay = true;
-        audio.play().catch(e => console.error("❌ 오디오 자동 재생 실패:", e));
+    };
+
+    // 오디오와 비디오(화면)를 구분해서 처리합니다.
+    pc.ontrack = (event) => {
+        if (event.track.kind === 'audio') {
+            let audio = document.getElementById(`audio-${targetId}`);
+            if (!audio) {
+                audio = document.createElement("audio");
+                audio.id = `audio-${targetId}`;
+                document.body.appendChild(audio);
+            }
+            audio.srcObject = event.streams[0];
+            audio.play().catch(e => console.error(e));
+        } 
+        else if (event.track.kind === 'video') {
+            
+            // 핵심: Blazor에게 "이 사람 공유 켰어! 카드 바꿔줘!" 라고 명령합니다.
+            dotNetHelper.invokeMethodAsync('SetUserScreenShareState', targetId, true);
+
+            // Blazor가 카드를 다시 그릴 시간을 0.1초 준 뒤에 비디오 화면을 연결합니다.
+            setTimeout(() => {
+                let video = document.getElementById(`video-${targetId}`);
+                if (video) {
+                    video.srcObject = event.streams[0];
+                }
+            }, 100);
+
+            // 화면 공유가 끝났을 때
+            event.track.onended = () => {
+                dotNetHelper.invokeMethodAsync('SetUserScreenShareState', targetId, false);
+            };
+        }
     };
 
     pc.onicecandidate = (event) => {
         if (event.candidate) {
             dotNetHelper.invokeMethodAsync('SendSignalToHex', targetId, JSON.stringify({ candidate: event.candidate }));
         }
-    };
-
-    // 연결 상태 모니터링 로그 추가
-    pc.onconnectionstatechange = () => {
-        console.log(`🚩 [연결 상태 변경] ${targetId}: ${pc.connectionState}`);
     };
 
     return pc;
