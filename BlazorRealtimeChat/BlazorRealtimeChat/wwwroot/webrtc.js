@@ -83,27 +83,36 @@ window.webrtcFunctions = {
             console.log(`📥 [SDP 수신] 타입: ${signal.sdp.type}, 발신: ${senderId}`);
             if (!pc) pc = createPeerConnection(senderId);
 
-            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-
-            if (signal.sdp.type === 'offer') {
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                await dotNetHelper.invokeMethodAsync('SendSignalToHex', senderId, JSON.stringify({ sdp: pc.localDescription }));
-            }
-
-            // [추가] SDP 처리 후 쌓여있던 ICE 후보들을 모두 적용
-            if (iceCandidatesQueue[senderId]) {
-                while (iceCandidatesQueue[senderId].length) {
-                    const candidate = iceCandidatesQueue[senderId].shift();
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            try {
+                // 👇 [핵심 수정 3] SDP 충돌(Glare) 에러 방어
+                // 내가 방금 연결을 요청했는데, 상대방도 동시에 요청해서 꼬인 경우 무시합니다.
+                if (signal.sdp.type === 'offer' && pc.signalingState !== 'stable') {
+                    console.warn("SDP Offer 충돌 감지. 무시하고 기존 연결을 유지합니다.");
+                    return;
                 }
+
+                await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+
+                if (signal.sdp.type === 'offer') {
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    await dotNetHelper.invokeMethodAsync('SendSignalToHex', senderId, JSON.stringify({ sdp: pc.localDescription }));
+                }
+
+                if (iceCandidatesQueue[senderId]) {
+                    while (iceCandidatesQueue[senderId].length) {
+                        const candidate = iceCandidatesQueue[senderId].shift();
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    }
+                }
+            } catch (e) {
+                // 에러가 발생해도 빨간 줄만 띄우고 앱 전체가 터지지 않게 보호합니다.
+                console.error("SDP 처리 에러 (앱 보호됨):", e);
             }
         } else if (signal.candidate) {
-            console.log(`📥 [ICE Candidate 수신] 발신: ${senderId}`);
             if (pc && pc.remoteDescription) {
-                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                pc.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(e => console.warn(e));
             } else {
-                // PC가 없거나 아직 RemoteDescription이 설정 전이면 큐에 저장
                 if (!iceCandidatesQueue[senderId]) iceCandidatesQueue[senderId] = [];
                 iceCandidatesQueue[senderId].push(signal.candidate);
             }
@@ -280,32 +289,44 @@ window.webrtcFunctions = {
 
 };
 
+// webrtc.js 파일 내 위치
+
 function createPeerConnection(targetId) {
+    console.log(`🔨 [PC 생성] ID: ${targetId}`); 
     const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
     peerConnections[targetId] = pc;
 
+    // 1. 기본 마이크 스트림 연결
     if (localStream) {
         localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
     }
 
-    // 👇 [추가] 트랙이 새로 추가되거나 삭제될 때 자동으로 재협상(Offer)을 보냅니다.
+    // 👇 [핵심 수정 1] 내가 이미 화면공유 중일 때, 나중에 들어온 유저에게도 즉시 화면을 보냅니다!
+    if (typeof localScreenStream !== 'undefined' && localScreenStream !== null) {
+        localScreenStream.getTracks().forEach(track => pc.addTrack(track, localScreenStream));
+    }
+
+    pc.isNegotiating = false; // 재협상 락(Lock) 변수
+
+    // 👇 [핵심 수정 2] 재협상(Renegotiation) 시 m-lines 꼬임 방지 안전장치
     pc.onnegotiationneeded = async () => {
+        // 이미 협상 중이거나 연결이 불안정하면 무시합니다.
+        if (pc.isNegotiating || pc.signalingState !== "stable") return;
+        pc.isNegotiating = true;
         try {
-            // 연결 상태가 안정적일 때만 Offer를 생성해야 충돌이 안 납니다.
-            if (pc.signalingState !== "stable") return; 
-            
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             await dotNetHelper.invokeMethodAsync('SendSignalToHex', targetId, JSON.stringify({ sdp: pc.localDescription }));
         } catch (e) {
-            console.error("재협상 에러:", e);
+            console.error("재협상 에러 무시 (자연스러운 현상):", e);
+        } finally {
+            pc.isNegotiating = false;
         }
     };
 
-    // 오디오와 비디오(화면)를 구분해서 처리합니다.
     pc.ontrack = (event) => {
         if (event.track.kind === 'audio') {
             let audio = document.getElementById(`audio-${targetId}`);
@@ -318,11 +339,8 @@ function createPeerConnection(targetId) {
             audio.play().catch(e => console.error(e));
         } 
         else if (event.track.kind === 'video') {
-            
-            // 핵심: Blazor에게 "이 사람 공유 켰어! 카드 바꿔줘!" 라고 명령합니다.
             dotNetHelper.invokeMethodAsync('SetUserScreenShareState', targetId, true);
 
-            // Blazor가 카드를 다시 그릴 시간을 0.1초 준 뒤에 비디오 화면을 연결합니다.
             setTimeout(() => {
                 let video = document.getElementById(`video-${targetId}`);
                 if (video) {
@@ -330,7 +348,6 @@ function createPeerConnection(targetId) {
                 }
             }, 100);
 
-            // 화면 공유가 끝났을 때
             event.track.onended = () => {
                 dotNetHelper.invokeMethodAsync('SetUserScreenShareState', targetId, false);
             };
