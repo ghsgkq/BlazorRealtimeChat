@@ -244,6 +244,11 @@ namespace BlazorRealtimeChat.Hubs
         }
 
 
+        public async Task SendScreenShareState(string channelId, bool isSharing)
+        {
+            // 그룹 전체에게 이 유저가 화면 공유를 켰는지/껐는지 방송합니다.
+            await Clients.Group($"voice-{channelId}").SendAsync("ReceiveScreenShareState", Context.ConnectionId, isSharing);
+        }
         //-- WebRTC 관련 메서드 --//
 
 

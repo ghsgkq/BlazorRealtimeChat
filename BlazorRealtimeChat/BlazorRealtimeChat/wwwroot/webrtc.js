@@ -67,12 +67,11 @@ window.webrtcFunctions = {
     },
 
     initializeConnection: async (targetId) => {
-        console.log(`📡 [Offer 생성] 대상: ${targetId}`);
-        const pc = createPeerConnection(targetId);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        await dotNetHelper.invokeMethodAsync('SendSignalToHex', targetId, JSON.stringify({ sdp: pc.localDescription }));
+        console.log(`📡 [연결 초기화] 대상: ${targetId}`);
+        // 👇 [핵심 수정] 여기서 강제로 Offer를 만들지 않습니다.
+        // createPeerConnection에서 오디오/비디오 트랙을 모두 넣고 나면,
+        // 브라우저가 알아서 안전하게 onnegotiationneeded를 한 번만 발생시킵니다!
+        createPeerConnection(targetId);
     },
 
     handleSignal: async (senderId, signalJson) => {
@@ -336,21 +335,17 @@ function createPeerConnection(targetId) {
                 document.body.appendChild(audio);
             }
             audio.srcObject = event.streams[0];
-            audio.play().catch(e => console.error(e));
+            audio.play().catch(e => console.error("오디오 재생 실패:", e));
         } 
         else if (event.track.kind === 'video') {
-            dotNetHelper.invokeMethodAsync('SetUserScreenShareState', targetId, true);
-
+            // [핵심 수정] JS에서 강제로 UI를 건드리거나 Blazor를 호출(SetUserScreenShareState)하지 않습니다.
+            // UI 상태는 SignalR이 책임지므로, 여기서는 시간차를 두고 영상 데이터만 매핑합니다.
             setTimeout(() => {
                 let video = document.getElementById(`video-${targetId}`);
                 if (video) {
                     video.srcObject = event.streams[0];
                 }
             }, 100);
-
-            event.track.onended = () => {
-                dotNetHelper.invokeMethodAsync('SetUserScreenShareState', targetId, false);
-            };
         }
     };
 

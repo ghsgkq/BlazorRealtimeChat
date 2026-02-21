@@ -852,6 +852,28 @@
             }
         });
 
+        hubConnection.On<string, bool>("ReceiveScreenShareState", (connectionId, isSharing) =>
+        {
+            screenSharingStates[connectionId] = isSharing;
+            StateHasChanged(); // UI 즉시 갱신
+        });
+
+        // 👇 2. [기존 코드 수정] 유저 목록이 갱신될 때, 나간 사람의 화면 공유 잔해도 싹 치워줍니다!
+        hubConnection.On<string, List<VoiceUserDto>>("UpdateVoiceUsers", (channelId, users) =>
+        {
+            voiceRoomUsers[channelId] = users;
+            
+            // 현재 방에 없는 유저의 화면 공유 상태(screenSharingStates) 청소
+            var currentUserIds = users.Select(u => u.ConnectionId).ToList();
+            var keysToRemove = screenSharingStates.Keys.Where(k => !currentUserIds.Contains(k)).ToList();
+            foreach (var key in keysToRemove)
+            {
+                screenSharingStates.Remove(key);
+            }
+
+            StateHasChanged();
+        });
+
 
         try
         {
@@ -1693,20 +1715,35 @@
         if (!isScreenSharing)
         {
             var success = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startScreenShare");
-            if (success) isScreenSharing = true;
+            if (success) 
+            {
+                isScreenSharing = true;
+                // 내가 화면을 켰다고 모두에게 알림!
+                if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
+                    await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), true);
+                }
+            }
         }
         else
         {
             await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopScreenShare");
             isScreenSharing = false;
+            // 내가 화면을 껐다고 모두에게 알림!
+            if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
+                await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), false);
+            }
         }
+        StateHasChanged(); // 상태 저장 후 무조건 UI 새로고침! (버튼 무한 클릭 방지)
     }
 
     // 브라우저 자체의 '공유 중지' 버튼을 눌렀을 때 C# 버튼 상태 동기화
     [JSInvokable("OnScreenShareStopped")]
-    public void OnScreenShareStopped()
+    public async Task OnScreenShareStopped()
     {
         isScreenSharing = false;
+        if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
+            await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), false);
+        }
         StateHasChanged();
     }
 
