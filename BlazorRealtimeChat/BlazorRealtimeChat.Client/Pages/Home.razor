@@ -820,21 +820,26 @@
 
         hubConnection.On<string, List<VoiceUserDto>>("UpdateVoiceUsers", async (channelId, users) =>
         {
-            voiceRoomUsers[channelId] = users;
-            
-            var currentUserIds = users.Select(u => u.ConnectionId).ToList();
-
-            // 👇 [핵심 추가] JS에게 방에 없는 사람의 유령 연결(PC)을 파괴하라고 명령!
-            await JSRuntime.InvokeVoidAsync("webrtcFunctions.removeDisconnectedPeers", currentUserIds);
-
-            // 기존: 화면 공유 상태 청소 로직 유지
-            var keysToRemove = screenSharingStates.Keys.Where(k => !currentUserIds.Contains(k)).ToList();
-            foreach (var key in keysToRemove)
+            try 
             {
-                screenSharingStates.Remove(key);
-            }
+                voiceRoomUsers[channelId] = users;
+                var currentUserIds = users.Select(u => u.ConnectionId).ToList();
 
-            StateHasChanged();
+                // 자바스크립트에게 나간 사람 연결 끊으라고 지시
+                await JSRuntime.InvokeVoidAsync("webrtcFunctions.removeDisconnectedPeers", currentUserIds);
+
+                // C# 화면 공유 상태 찌꺼기 청소
+                var keysToRemove = screenSharingStates.Keys.Where(k => !currentUserIds.Contains(k)).ToList();
+                foreach (var key in keysToRemove) screenSharingStates.Remove(key);
+            }
+            catch (Exception ex) 
+            {
+                Console.WriteLine("유저 갱신 에러 (앱 보호됨): " + ex.Message);
+            }
+            finally 
+            {
+                StateHasChanged();
+            }
         });
 
         hubConnection.On<string, bool>("ReceiveSpeakingState", (connectionId, isSpeaking) =>
@@ -1380,44 +1385,44 @@
     }
 
 
-    // 👇 [수정 1] async void 대신 async Task로 변경하여 앱이 뻗는 것을 방지합니다!
+    
     private async Task LeaveVoiceChannel()
     {
-        if (selectedVoiceChannel != null && hubConnection != null)
+        if (selectedVoiceChannel != null)
         {
-            // try-catch로 감싸서 혹시 통신 에러가 나도 앱이 죽지 않게 보호합니다.
+            // 1. [핵심] 가장 먼저 모든 C# 상태를 초기화합니다! (UI 꼬임 원천 차단)
+            isScreenSharing = false;
+            speakingStates.Clear();
+            screenSharingStates.Clear();
+            userVolumes.Clear();
+            userMutes.Clear();
+            openMenuConnectionId = null;
+
             try
             {
-                // 1. 분석 중지
+                // 2. JS 오디오 분석기 중지
                 await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopAudioAnalysis");
-                
-                // 2. 상태 변수들 싹 초기화
-                isScreenSharing = false;   
-                speakingStates.Clear();    
-                screenSharingStates.Clear(); 
-                userVolumes.Clear();       
-                userMutes.Clear();
-                openMenuConnectionId = null; 
 
-                // 3. 서버에 퇴장 알림 (연결되어 있을 때만)
-                if (hubConnection.State == HubConnectionState.Connected)
+                // 3. 서버에 퇴장 알림 (인터넷이 끊겨서 여기서 에러가 날 수 있음)
+                if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
                 {
                     await hubConnection.SendAsync("LeaveVoiceGroup", selectedVoiceChannel.ChannelId.ToString());
                 }
-                
-                // 4. JS에게 마이크/화면 스트림 끄기 명령
-                await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
             }
             catch (Exception ex)
             {
-                // 에러가 나면 콘솔에만 찍고 넘어갑니다.
-                Console.WriteLine($"채널 퇴장 중 오류 발생: {ex.Message}");
+                Console.WriteLine($"퇴장 통신 오류 (무시됨): {ex.Message}");
             }
             finally
             {
-                // 👇 [핵심] 에러가 나든 안 나든, 화면 상태는 무조건 텍스트 채팅으로 초기화합니다!
+                // 4. [완벽 방어] 위에서 에러가 나든 안 나든, 무조건 로컬 카메라와 유령 PC를 파괴합니다!!
+                try {
+                    await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopStream");
+                } catch { /* 무시 */ }
+
+                // 5. 화면을 텍스트 채팅으로 돌려보냅니다.
                 selectedVoiceChannel = null;
-                currentMainView = "text"; 
+                currentMainView = "text";
                 StateHasChanged();
             }
         }

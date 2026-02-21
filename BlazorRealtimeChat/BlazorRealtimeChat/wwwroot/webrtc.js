@@ -136,38 +136,36 @@ window.webrtcFunctions = {
         }
     },
 
-    stopStream: () => {
-        console.log("Stopping local stream...");
+stopStream: () => {
+        console.log("Stopping local stream completely...");
         
-        // 1. 마이크 스트림 정지
+        // 마이크 강제 종료
         if (localStream) {
             localStream.getTracks().forEach(track => track.stop());
             localStream = null;
         }
 
-        // 👇 [추가됨] 2. 화면 공유 스트림도 있으면 정지!
+        // 👇 [핵심 방어] 화면 공유 강제 종료 (유령 이벤트 onended 트리거 방지!)
         if (localScreenStream) {
-            localScreenStream.getTracks().forEach(track => track.stop());
+            localScreenStream.getTracks().forEach(track => {
+                track.onended = null; // C#을 괴롭히는 찌꺼기 이벤트 삭제
+                track.stop();
+            });
             localScreenStream = null;
-            // C# 쪽에 꺼졌다고 알림
-            if (dotNetHelper) {
-                dotNetHelper.invokeMethodAsync("OnScreenShareStopped");
+        }
+
+        const localVideo = document.getElementById("local-video");
+        if (localVideo) localVideo.srcObject = null;
+
+        // 모든 유령 PeerConnection 파괴
+        for (let id in peerConnections) {
+            if (peerConnections[id].signalingState !== "closed") {
+                peerConnections[id].close();
             }
         }
-
-        // 3. UI 초기화
-        const localVideo = document.getElementById("local-video");
-        if (localVideo) {
-             localVideo.srcObject = null;
-        }
-
-        // 4. 피어 연결 모두 종료
-        for (let id in peerConnections) {
-            peerConnections[id].close();
-        }
         peerConnections = {};
+        iceCandidatesQueue = {};
     },
-
     // 오디오 분석 시작
     setupAudioAnalysis: async () => {
         if (!localStream) return;
@@ -223,6 +221,10 @@ window.webrtcFunctions = {
     // --- 화면 공유 시작 ---
     startScreenShare: async () => {
         try {
+            if (localScreenStream) {
+                localScreenStream.getTracks().forEach(t => t.stop());
+            }
+            
             // 1. 브라우저에 화면 공유 권한을 요청합니다.
             localScreenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
             const screenTrack = localScreenStream.getVideoTracks()[0];
