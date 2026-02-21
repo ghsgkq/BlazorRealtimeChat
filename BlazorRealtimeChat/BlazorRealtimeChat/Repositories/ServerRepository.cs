@@ -35,4 +35,16 @@ public class ServerRepository(RealTimeChatContext context) : IServerRepository
         await context.SaveChangesAsync();
         return server;
     }
+
+    public async Task<bool> DeleteServerAsync(Guid serverId)
+    {
+        var server = await context.Servers.FindAsync(serverId);
+        if (server == null) return false;
+
+        context.Servers.Remove(server);
+        await context.SaveChangesAsync(); 
+        // Entity Framework의 'Cascade Delete(연쇄 삭제)' 기능 덕분에 
+        // 서버에 속한 채널, 메시지, 멤버 기록들도 자동으로 깔끔하게 지워집니다!
+        return true;
+    }
 }

@@ -542,6 +542,11 @@
                     </div>
                 }
 
+                <hr class="border-secondary mt-4 mb-3" style="opacity: 0.3;" />
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <span class="small fw-bold text-danger text-uppercase">위험 구역</span>
+                    <button class="btn btn-sm btn-outline-danger fw-bold" @onclick="HandleDeleteServer">서버 삭제</button>
+                </div>
                 <div class="d-flex justify-content-end gap-2 mt-4">
                     <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="CloseServerSettingsModal">취소</button>
                     <button class="btn btn-sm btn-discord" @onclick="SaveServerSettings">변경사항 저장</button>
@@ -1414,6 +1419,60 @@
             isServerSettingsUpdateSuccess = false;
             serverSettingsUpdateMessage = "설정 저장에 실패했습니다. 권한이 없거나 서버 오류입니다.";
             StateHasChanged();
+        }
+    }
+    
+    // 서버 삭제
+    private async Task HandleDeleteServer()
+    {
+        if (selectedServer == null) return;
+
+        // 1. 실수로 지우지 않도록 무조건 한 번 더 물어봅니다.
+        var swalResult = await JSRuntime.InvokeAsync<JsonElement>("Swal.fire", new
+        {
+            title = "서버 삭제",
+            text = $"정말 '{selectedServer.ServerName}' 서버를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+            icon = "warning",
+            showCancelButton = true,
+            confirmButtonColor = "#d33",
+            cancelButtonColor = "#3085d6",
+            confirmButtonText = "삭제하기",
+            cancelButtonText = "취소"
+        });
+
+        // 2. 사용자가 '삭제하기'를 눌렀을 때만 진행
+        if (swalResult.TryGetProperty("isConfirmed", out var isConfirmed) && isConfirmed.GetBoolean())
+        {
+            var result = await ServerService.DeleteServerAsync(selectedServer.ServerId);
+            
+            if (result)
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire", "삭제 완료", "서버가 성공적으로 삭제되었습니다.", "success");
+                
+                // 3. UI에서 삭제된 서버를 즉시 지우고 모달을 닫습니다.
+                servers.RemoveAll(s => s.ServerId == selectedServer.ServerId);
+                CloseServerSettingsModal();
+                
+                // 4. 삭제 후 화면 정리 (다른 서버로 이동하거나, 서버가 아예 없으면 빈 화면 표시)
+                if (servers.Any())
+                {
+                    await SelectServer(servers.First());
+                }
+                else
+                {
+                    selectedServer = null;
+                    selectedTextChannel = null;
+                    selectedVoiceChannel = null;
+                    channels.Clear();
+                    chatMessages.Clear();
+                    serverMembers.Clear();
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("Swal.fire", "오류", "서버 삭제에 실패했습니다.", "error");
+            }
         }
     }
 

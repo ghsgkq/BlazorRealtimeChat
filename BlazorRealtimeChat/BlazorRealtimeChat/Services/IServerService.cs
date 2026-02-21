@@ -13,4 +13,6 @@ public interface IServerService
     Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId);
 
     Task<ServerDto?> UpdateServerAsync(Guid serverId, UpdateServerDto updateDto, Guid userId);
+
+    Task<bool> DeleteServerAsync(Guid serverId, Guid userId);
 }

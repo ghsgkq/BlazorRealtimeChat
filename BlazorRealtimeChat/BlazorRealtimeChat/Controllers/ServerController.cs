@@ -106,4 +106,30 @@ public class ServerController(IServerService serverService) : Controller
             return StatusCode(500, "서버 업데이트 중 오류가 발생했습니다.");
         }
     }
+
+    [HttpDelete("{serverId}")]
+    public async Task<IActionResult> DeleteServer(Guid serverId)
+    {
+        var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
+        {
+            return Unauthorized("인증되지 않은 사용자입니다.");
+        }
+
+        try
+        {
+            var result = await serverService.DeleteServerAsync(serverId, userId);
+            if (!result) return NotFound("서버를 찾을 수 없거나 삭제에 실패했습니다.");
+
+            return Ok(new { Message = "서버가 성공적으로 삭제되었습니다." });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid(ex.Message);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, "서버 삭제 중 오류가 발생했습니다.");
+        }
+    }
 }

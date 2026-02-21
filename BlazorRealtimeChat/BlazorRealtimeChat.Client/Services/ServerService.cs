@@ -69,4 +69,10 @@ public class ServerService : IServerService
         return null;
     }
 
+    public async Task<bool> DeleteServerAsync(Guid serverId)
+    {
+        var response = await _httpClient.DeleteAsync($"api/servers/{serverId}");
+        return response.IsSuccessStatusCode;
+    }
+
 }

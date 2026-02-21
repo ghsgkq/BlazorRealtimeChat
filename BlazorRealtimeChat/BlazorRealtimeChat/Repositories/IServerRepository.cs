@@ -10,4 +10,6 @@ public interface IServerRepository
     Task<Server?> GetServerByIdAsync(Guid serverId);
 
     Task<Server> UpdateServerAsync(Server server);
+
+    Task<bool> DeleteServerAsync(Guid serverId);
 }

@@ -153,4 +153,42 @@ public class ServerService(
         };
     }
     
+    public async Task<bool> DeleteServerAsync(Guid serverId, Guid userId)
+    {
+        var server = await serverRepository.GetServerByIdAsync(serverId);
+        if (server == null) return false;
+
+        // 💡 방장 권한 체크!
+        if (server.OwnerId != userId)
+        {
+            throw new UnauthorizedAccessException("서버 방장만 서버를 삭제할 수 있습니다.");
+        }
+
+        // 👇 3. [추가] 물리적 프로필 이미지 파일 삭제 로직
+        if (!string.IsNullOrEmpty(server.ProfileImageUrl))
+        {
+            try
+            {
+                // URL (예: "/user-files/abc-123.jpg") 에서 순수 파일명("abc-123.jpg")만 추출합니다.
+                var fileName = Path.GetFileName(server.ProfileImageUrl);
+                
+                // FileController와 똑같은 경로(ExternalUploads)를 조합합니다.
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "ExternalUploads", fileName);
+
+                // 해당 경로에 실제 파일이 존재하면 지워줍니다.
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                    Console.WriteLine($"[System] 서버 프로필 이미지 삭제 완료: {fileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // 혹시 파일이 사용 중이거나 오류가 나도, DB 삭제는 마저 진행되도록 catch만 해둡니다.
+                Console.WriteLine($"[Error] 서버 프로필 이미지 삭제 실패: {ex.Message}");
+            }
+        }
+
+        return await serverRepository.DeleteServerAsync(serverId);
+    }
 }
