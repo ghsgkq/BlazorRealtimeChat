@@ -75,4 +75,35 @@ public class ServerController(IServerService serverService) : Controller
         var members = await serverService.GetServerMembersAsync(serverId);
         return Ok(members);
     }
+
+    [HttpPut("{serverId}")]
+    public async Task<IActionResult> UpdateServer(Guid serverId, [FromBody] UpdateServerDto updateDto)
+    {
+        // 1. 토큰에서 유저 ID 추출
+        var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out Guid userId))
+        {
+            return Unauthorized("인증되지 않은 사용자입니다.");
+        }
+
+        try
+        {
+            // 2. 서비스에 업데이트 요청
+            var updatedServer = await serverService.UpdateServerAsync(serverId, updateDto, userId);
+            
+            if (updatedServer == null) 
+                return NotFound("서버를 찾을 수 없습니다.");
+
+            return Ok(updatedServer);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // 권한이 없는 경우 403 Forbidden 반환
+            return Forbid(ex.Message); 
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, "서버 업데이트 중 오류가 발생했습니다.");
+        }
+    }
 }

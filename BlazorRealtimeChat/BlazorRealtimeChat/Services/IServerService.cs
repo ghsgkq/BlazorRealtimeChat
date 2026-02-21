@@ -1,4 +1,5 @@
-﻿using BlazorRealtimeChat.Shared.DTOs;
+﻿using BlazorRealtimeChat.Data.Entity;
+using BlazorRealtimeChat.Shared.DTOs;
 
 namespace BlazorRealtimeChat.Services;
 
@@ -10,4 +11,6 @@ public interface IServerService
     Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId, Guid userId);
 
     Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId);
+
+    Task<ServerDto?> UpdateServerAsync(Guid serverId, UpdateServerDto updateDto, Guid userId);
 }

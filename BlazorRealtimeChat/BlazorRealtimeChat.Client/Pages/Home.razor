@@ -32,8 +32,16 @@
         {
             @foreach (var server in servers)
             {
-                <div class="server-icon @(selectedServer == server ? "selected" : "")" @onclick="() => SelectServer(server)">
-                    @server.ServerName.Substring(0, 1)
+                <div class="server-icon @(selectedServer?.ServerId == server.ServerId ? "selected" : "")" @onclick="() => SelectServer(server)">
+                    @* 프로필 이미지가 있으면 보여주고, 없으면 기존처럼 첫 글자를 보여줍니다. *@
+                    @if (!string.IsNullOrEmpty(server.ProfileImageUrl))
+                    {
+                        <img src="@server.ProfileImageUrl" style="width: 100%; height: 100%; border-radius: inherit; object-fit: cover;" />
+                    }
+                    else
+                    {
+                        @server.ServerName.Substring(0, 1)
+                    }
                 </div>
             }
         }
@@ -492,6 +500,56 @@
     </div>
 }
 
+@* --- 서버 설정 모달창 --- *@
+@if (isServerSettingsModalOpen)
+{
+    <div class="profile-modal-backdrop" @onclick="CloseServerSettingsModal">
+        <div class="profile-card" @onclick:stopPropagation>
+            @* 상단 배너 (서버는 회색 느낌으로 다르게 줘볼까요?) *@
+            <div class="profile-banner bg-secondary"></div>
+
+            <div class="profile-content p-3">
+                <h5 class="fw-bold mb-3 text-center text-white">서버 설정</h5>
+
+                @* 서버 이미지 편집 영역 *@
+                <div class="avatar-edit-wrapper mx-auto mb-3" @onclick="@(() => JSRuntime.InvokeVoidAsync("clickElement", "serverProfileInput"))">
+                    @if (!string.IsNullOrEmpty(editServerProfileUrl))
+                    {
+                        <img src="@editServerProfileUrl" class="profile-avatar-large" />
+                    }
+                    else
+                    {
+                        <div class="bg-secondary rounded-circle text-white fw-bold d-flex align-items-center justify-content-center profile-avatar-large" style="font-size: 25px;">
+                            @editServerName?.Substring(0, 1).ToUpper()
+                        </div>
+                    }
+                    <div class="avatar-hint"><i class="bi bi-camera-fill"></i></div>
+                </div>
+                <InputFile OnChange="HandleServerProfileImageUpload" id="serverProfileInput" style="display:none;" />
+
+                @* 서버 이름 수정 *@
+                <div class="mt-4">
+                    <label class="small fw-bold text-secondary text-uppercase mb-2">서버 이름</label>
+                    <input type="text" class="discord-input w-100 mb-3" @bind="editServerName" />
+                </div>
+
+                @* 알림 메시지 *@
+                @if (serverSettingsUpdateMessage != null)
+                {
+                    <div class="inline-alert @(isServerSettingsUpdateSuccess ? "alert-success" : "alert-danger") animate__animated animate__fadeIn">
+                        <i class="bi @(isServerSettingsUpdateSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i>
+                        @serverSettingsUpdateMessage
+                    </div>
+                }
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="CloseServerSettingsModal">취소</button>
+                    <button class="btn btn-sm btn-discord" @onclick="SaveServerSettings">변경사항 저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     private List<ServerDto> servers = new List<ServerDto>();
@@ -556,6 +614,12 @@
     // 서버 맴버 목록
     private List<ServerMemberDto> serverMembers = new();
 
+    // 서버 설정 모달창 설정값
+    private bool isServerSettingsModalOpen = false;
+    private string? editServerName;
+    private string? editServerProfileUrl;
+    private string? serverSettingsUpdateMessage;
+    private bool isServerSettingsUpdateSuccess = false;
     
 
     // 모달 열기/닫기 메서드
@@ -1266,10 +1330,91 @@
         }
     }
 
+    // 기존에 빈 껍데기만 있던 OpenServerSettings() 함수를 덮어씁니다.
     private void OpenServerSettings()
     {
-        // 서버 삭제나 이름 수정을 할 수 있는 모달을 띄우는 로직을 여기에 넣습니다.
-        Console.WriteLine("서버 설정 모달 열기");
+        if (selectedServer != null && selectedServer.OwnerId == currentUserId)
+        {
+            // 현재 서버 정보로 모달 텍스트박스 초기화
+            editServerName = selectedServer.ServerName;
+            editServerProfileUrl = selectedServer.ProfileImageUrl;
+            serverSettingsUpdateMessage = null;
+            
+            isServerSettingsModalOpen = true;
+        }
+    }
+
+    // 서버 설정 모달 닫기
+    private void CloseServerSettingsModal()
+    {
+        isServerSettingsModalOpen = false;
+    }
+
+    // 서버 이미지 업로드 처리
+    private async Task HandleServerProfileImageUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        serverSettingsUpdateMessage = "이미지 업로드 중...";
+        isServerSettingsUpdateSuccess = true;
+        StateHasChanged();
+
+        try
+        {
+            // 유저 프로필 때 쓰던 FileService를 똑같이 씁니다!
+            var uploadedFile = await fileService.UploadFileAsync(file);
+            editServerProfileUrl = uploadedFile.FileUrl;
+
+            isServerSettingsUpdateSuccess = true;
+            serverSettingsUpdateMessage = "이미지가 준비되었습니다. '변경사항 저장'을 눌러주세요!";
+        }
+        catch (Exception ex)
+        {
+            isServerSettingsUpdateSuccess = false;
+            serverSettingsUpdateMessage = "이미지 업로드에 실패했습니다.";
+        }
+        StateHasChanged();
+    }
+
+    // 서버 설정 최종 저장
+    private async Task SaveServerSettings()
+    {
+        if (selectedServer == null || string.IsNullOrWhiteSpace(editServerName)) return;
+
+        var updateDto = new UpdateServerDto
+        {
+            ServerName = editServerName,
+            ProfileImageUrl = editServerProfileUrl
+        };
+
+        var updatedServer = await ServerService.UpdateServerAsync(selectedServer.ServerId, updateDto);
+
+        if (updatedServer != null)
+        {
+            // 1. 화면의 서버 목록(servers)에서 옛날 데이터를 찾아 새 데이터로 교체합니다.
+            var index = servers.FindIndex(s => s.ServerId == updatedServer.ServerId);
+            if (index != -1) servers[index] = updatedServer;
+            
+            // 2. 현재 선택된 서버 정보 갱신
+            selectedServer = updatedServer;
+            
+            isServerSettingsUpdateSuccess = true;
+            serverSettingsUpdateMessage = "서버 설정이 성공적으로 저장되었습니다!";
+            StateHasChanged();
+
+            // 1.5초 뒤에 모달을 자동으로 닫습니다.
+            await Task.Delay(1500);
+            serverSettingsUpdateMessage = null;
+            CloseServerSettingsModal();
+            StateHasChanged();
+        }
+        else
+        {
+            isServerSettingsUpdateSuccess = false;
+            serverSettingsUpdateMessage = "설정 저장에 실패했습니다. 권한이 없거나 서버 오류입니다.";
+            StateHasChanged();
+        }
     }
 
     // 로그아웃

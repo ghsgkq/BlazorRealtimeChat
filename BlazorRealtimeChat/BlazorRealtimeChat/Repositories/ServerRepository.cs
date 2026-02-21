@@ -28,4 +28,11 @@ public class ServerRepository(RealTimeChatContext context) : IServerRepository
     {
         return await context.Servers.FirstOrDefaultAsync(s => s.ServerId == serverId);
     }
+
+    public async Task<Server> UpdateServerAsync(Server server)
+    {
+        context.Servers.Update(server);
+        await context.SaveChangesAsync();
+        return server;
+    }
 }

@@ -58,4 +58,15 @@ public class ServerService : IServerService
         }
     }
 
+    public async Task<ServerDto?> UpdateServerAsync(Guid serverId, UpdateServerDto updateDto)
+    {
+        var response = await _httpClient.PutAsJsonAsync($"api/servers/{serverId}", updateDto);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<ServerDto>();
+        }
+        return null;
+    }
+
 }

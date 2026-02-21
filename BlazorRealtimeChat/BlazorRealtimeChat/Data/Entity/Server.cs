@@ -13,9 +13,11 @@ public class Server
     [MaxLength(100)]
     public string ServerName { get; set; } = string.Empty;
 
-    //-- 추가 속성
     [Required]
     public Guid OwnerId { get; set; } // 서버 소유자 ID
+
+    // 서버 프로필
+    public string? ProfileImageUrl {get; set;}
 
     [ForeignKey("OwnerId")]
     public virtual User Owner { get; set; } = null!; // 서버 소유자 정보 (@ManyToOne)

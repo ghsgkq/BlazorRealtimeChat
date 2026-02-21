@@ -11,4 +11,6 @@ public interface IServerService
     Task<ServerPreviewDto?> GetServerPreviewAsync(Guid serverId);
 
     Task<IEnumerable<ServerMemberDto>> GetServerMembersAsync(Guid serverId);
+
+    Task<ServerDto?> UpdateServerAsync(Guid serverId, UpdateServerDto updateDto);
 }

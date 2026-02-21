@@ -117,4 +117,40 @@ public class ServerService(
         }).OrderByDescending(m => m.IsOnline).ThenBy(m => m.UserName).ToList(); 
         // (온라인 유저를 위로, 그다음 이름순 정렬)
     }
+
+    public async Task<ServerDto?> UpdateServerAsync(Guid serverId, UpdateServerDto updateDto, Guid userId)
+    {
+        // 1. 수정할 서버가 실제로 존재하는지 가져옵니다.
+        var server = await serverRepository.GetServerByIdAsync(serverId);
+        if (server == null) return null;
+
+        // 2. 💡 핵심 보안: 요청한 사람이 서버 방장(Owner)인지 확인합니다.
+        if (server.OwnerId != userId)
+        {
+            throw new UnauthorizedAccessException("서버 방장만 설정을 변경할 수 있습니다.");
+        }
+
+        // 3. 넘어온 데이터로 서버 정보를 업데이트합니다.
+        if (!string.IsNullOrWhiteSpace(updateDto.ServerName))
+        {
+            server.ServerName = updateDto.ServerName;
+        }
+        
+        if (updateDto.ProfileImageUrl != null)
+        {
+            server.ProfileImageUrl = updateDto.ProfileImageUrl;
+        }
+
+        // 4. DB에 저장 후 DTO로 변환하여 반환합니다.
+        var updatedServer = await serverRepository.UpdateServerAsync(server);
+
+        return new ServerDto
+        {
+            ServerId = updatedServer.ServerId,
+            ServerName = updatedServer.ServerName,
+            OwnerId = updatedServer.OwnerId,
+            ProfileImageUrl = updatedServer.ProfileImageUrl
+        };
+    }
+    
 }
