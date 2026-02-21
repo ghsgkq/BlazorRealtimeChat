@@ -818,9 +818,22 @@
             await JSRuntime.InvokeVoidAsync("webrtcFunctions.initializeConnection", senderId);
         });
 
-        hubConnection.On<string, List<VoiceUserDto>>("UpdateVoiceUsers", (channelId, users) =>
+        hubConnection.On<string, List<VoiceUserDto>>("UpdateVoiceUsers", async (channelId, users) =>
         {
             voiceRoomUsers[channelId] = users;
+            
+            var currentUserIds = users.Select(u => u.ConnectionId).ToList();
+
+            // 👇 [핵심 추가] JS에게 방에 없는 사람의 유령 연결(PC)을 파괴하라고 명령!
+            await JSRuntime.InvokeVoidAsync("webrtcFunctions.removeDisconnectedPeers", currentUserIds);
+
+            // 기존: 화면 공유 상태 청소 로직 유지
+            var keysToRemove = screenSharingStates.Keys.Where(k => !currentUserIds.Contains(k)).ToList();
+            foreach (var key in keysToRemove)
+            {
+                screenSharingStates.Remove(key);
+            }
+
             StateHasChanged();
         });
 
@@ -1712,39 +1725,55 @@
     // 화면 공유 버튼 클릭 시 실행
     private async Task ToggleScreenShare()
     {
-        if (!isScreenSharing)
+        try
         {
-            var success = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startScreenShare");
-            if (success) 
+            if (!isScreenSharing)
             {
-                isScreenSharing = true;
-                // 내가 화면을 켰다고 모두에게 알림!
+                var success = await JSRuntime.InvokeAsync<bool>("webrtcFunctions.startScreenShare");
+                if (success) 
+                {
+                    isScreenSharing = true;
+                    if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
+                        await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), true);
+                    }
+                }
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopScreenShare");
+                isScreenSharing = false;
                 if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
-                    await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), true);
+                    await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), false);
                 }
             }
         }
-        else
+        catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("webrtcFunctions.stopScreenShare");
-            isScreenSharing = false;
-            // 내가 화면을 껐다고 모두에게 알림!
-            if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
-                await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), false);
-            }
+            Console.WriteLine($"화면 공유 토글 에러 (무시됨): {ex.Message}");
         }
-        StateHasChanged(); // 상태 저장 후 무조건 UI 새로고침! (버튼 무한 클릭 방지)
+        finally
+        {
+            // 에러가 나든 성공하든 무조건 UI를 고치도록 finally에 넣습니다.
+            StateHasChanged(); 
+        }
     }
 
     // 브라우저 자체의 '공유 중지' 버튼을 눌렀을 때 C# 버튼 상태 동기화
     [JSInvokable("OnScreenShareStopped")]
     public async Task OnScreenShareStopped()
     {
-        isScreenSharing = false;
-        if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
-            await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), false);
+        try
+        {
+            isScreenSharing = false;
+            if (hubConnection?.State == HubConnectionState.Connected && selectedVoiceChannel != null) {
+                await hubConnection.SendAsync("SendScreenShareState", selectedVoiceChannel.ChannelId.ToString(), false);
+            }
         }
-        StateHasChanged();
+        catch { /* 무시 */ }
+        finally
+        {
+            StateHasChanged();
+        }
     }
 
     // JS에서 화면을 받거나 끊겼을 때 호출되는 메서드

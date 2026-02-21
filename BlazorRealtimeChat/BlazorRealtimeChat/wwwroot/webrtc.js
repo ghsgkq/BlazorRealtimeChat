@@ -96,6 +96,24 @@ window.webrtcFunctions = {
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
                     await dotNetHelper.invokeMethodAsync('SendSignalToHex', senderId, JSON.stringify({ sdp: pc.localDescription }));
+
+                    // 👇 [핵심 추가] 내가 화면을 공유 중이라면 0.5초 뒤에 늦게 온 사람에게 강제로 화면(Offer)을 보냅니다!
+                    if (typeof localScreenStream !== 'undefined' && localScreenStream !== null) {
+                        setTimeout(async () => {
+                            if (pc.signalingState === "stable") {
+                                try {
+                                    pc.isNegotiating = true;
+                                    const offer = await pc.createOffer();
+                                    await pc.setLocalDescription(offer);
+                                    await dotNetHelper.invokeMethodAsync('SendSignalToHex', senderId, JSON.stringify({ sdp: pc.localDescription }));
+                                } catch (e) {
+                                    console.error("화면 공유 지연 재협상 에러:", e);
+                                } finally {
+                                    pc.isNegotiating = false;
+                                }
+                            }
+                        }, 500); // 0.5초 대기
+                    }
                 }
 
                 if (iceCandidatesQueue[senderId]) {
@@ -224,7 +242,10 @@ window.webrtcFunctions = {
             // 4. 현재 연결된 모든 사람(PeerConnection)에게 내 화면 트랙을 추가합니다.
             for (let id in peerConnections) {
                 const pc = peerConnections[id];
-                pc.addTrack(screenTrack, localScreenStream);
+                // 👇 이미 끊어진 연결에는 트랙을 넣지 않도록 방어
+                if (pc.signalingState !== "closed") {
+                    pc.addTrack(screenTrack, localScreenStream);
+                }
             }
             return true;
         } catch (e) {
@@ -250,11 +271,13 @@ window.webrtcFunctions = {
             // 3. 연결된 피어들에게서 비디오 트랙 제거
             for (let id in peerConnections) {
                 const pc = peerConnections[id];
-                const senders = pc.getSenders();
-                // 비디오 트랙(화면)을 찾아서 제거
-                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-                if (videoSender) {
-                    pc.removeTrack(videoSender);
+                // 이미 끊어진 연결에서 트랙을 빼지 않도록 방어
+                if (pc.signalingState !== "closed") {
+                    const senders = pc.getSenders();
+                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                    if (videoSender) {
+                        pc.removeTrack(videoSender);
+                    }
                 }
             }
 
@@ -284,7 +307,20 @@ window.webrtcFunctions = {
                 }
             }
         }
-    }
+    },
+    // 나간 사람의 연결을 완전히 부숴버리는 함수
+    removeDisconnectedPeers: (activeConnectionIds) => {
+        for (let id in peerConnections) {
+            if (!activeConnectionIds.includes(id)) {
+                console.log(`🔌 [정리] 방을 나간 유저(${id})의 연결을 완전히 종료합니다.`);
+                if (peerConnections[id].signalingState !== "closed") {
+                    peerConnections[id].close();
+                }
+                delete peerConnections[id];
+                if (iceCandidatesQueue[id]) delete iceCandidatesQueue[id];
+            }
+        }
+    },
 
 };
 
