@@ -21,6 +21,8 @@
 ![image](/img/Preview01.gif)
 ![image](/img/Preview02.gif)
 ![image](/img/Preview03.gif)
+![image](/img/Preview04.gif)
+![image](/img/Preview05.gif)
 ---
 
 ## 🚀 Key Features (핵심 기능)
