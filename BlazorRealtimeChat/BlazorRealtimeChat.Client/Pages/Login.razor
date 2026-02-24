@@ -33,9 +33,7 @@
                         <ValidationMessage For="@(() => loginModel.Password)" />
                     </div>
 
-                    <div class="mb-3">
-                        <a href="#" class="small text-decoration-none">비밀번호를 잊으셨나요?</a>
-                    </div>
+                    
 
                     <button type="submit" class="btn btn-primary w-100 btn-lg mt-3" disabled="@isProcessing">
                         @if(isProcessing)
