@@ -1,16 +1,17 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+﻿@inject IWebHostEnvironment Env
 
+@((MarkupString)System.IO.File.ReadAllText(System.IO.Path.Combine(Env.WebRootPath, "easteregg.html")))
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    @* 제가 멋대로 삭제했던, .NET 8의 올바른 정적 에셋 참조 방식입니다. *@
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["BlazorRealtimeChat.styles.css"]" />
     <link rel="stylesheet" href="@Assets["BlazorRealtimeChat.Client.styles.css"]" />    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons#1.11.0/font/bootstrap-icons.css">
     <title>BlazorRealtimeChat</title>
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
@@ -18,11 +19,11 @@
 </head>
 
 <body>
-    @* 사전 렌더링을 비활성화하는 올바른 설정은 그대로 유지합니다. *@
+    @((MarkupString)$"\n\n")
     <Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
     <script src="_framework/blazor.web.js"></script>
     <script src="@Assets["webrtc.js"]"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2#11"></script>
 
     <script>
          // 스크롤을 최하단으로 이동시키는 함수
@@ -37,7 +38,7 @@
             // 즉시 스코를 수행
             doScroll();
 
-                // 현재 요소 내의 모든 이미지와 비디오가 로드될 때마다 스크롤 다시 수행 (핵심!)
+            // 현재 요소 내의 모든 이미지와 비디오가 로드될 때마다 스크롤 다시 수행
             const mediaElements = element.querySelectorAll('img, video');
             mediaElements.forEach(media => {
             // 이미 로드된 경우를 대비해 이벤트 리스너 등록
@@ -123,5 +124,4 @@
         }
     </script>
 </body>
-
 </html>
