@@ -10,8 +10,8 @@
 
 사용자 간의 실시간 텍스트 채팅 및 음성 통화, 화면 공유를 지원하는 디스코드(Discord) 스타일의 SPA 웹 애플리케이션입니다. 
 
-**🔗 라이브 데모:** [https://chat.ghsgkq.xyz](https://chat.ghsgkq.xyz)
-*(💡 라즈베리파이 홈 서버로 구동 중입니다. 빠른 테스트를 위해 아래 게스트 계정을 사용해 보세요!)*
+~~**🔗 라이브 데모:** [https://chat.ghsgkq.xyz](https://chat.ghsgkq.xyz)~~
+~~*(💡 라즈베리파이 홈 서버로 구동 중입니다. 빠른 테스트를 위해 아래 게스트 계정을 사용해 보세요!)*~~
 > **Test Account 1:** `ckdgus5820` / `qwer1234!@`
 > **Test Account 2:** `ckdgus1234` / `qwer1234!@`
 
